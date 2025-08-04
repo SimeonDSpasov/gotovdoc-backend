@@ -1,0 +1,79 @@
+
+.coming-soon {
+  max-width: 480px;
+  margin: 6rem auto;
+  padding: 2.5rem;
+  text-align: center;
+}
+
+.title {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.subtitle {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  font-weight: 500;
+}
+
+.subtitle strong {
+  font-weight: 700;
+}
+
+.notify-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+}
+
+.notify-form .two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.notify-form input,
+.notify-form textarea {
+  padding: 0.7rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.notify-form textarea {
+  resize: none;
+}
+
+.notify-form button {
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 0.4rem;
+  background: var(--brand-neon);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.notify-form button:hover:not(:disabled) {
+  background: var(--brand-purple);
+}
+
+.notify-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.success-msg {
+  margin-top: 1.5rem;
+  color: var(--brand-purple);
+} 

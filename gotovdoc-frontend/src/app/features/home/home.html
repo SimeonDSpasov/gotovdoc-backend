@@ -1,0 +1,18 @@
+
+<section class="coming-soon glass">
+  <h1 class="title">Очаквайте скоро</h1>
+  <p class="subtitle">Платформата <strong>ГОТОВДОК</strong> се подготвя за старт. Ако желаете да получите известие при стартиране, оставете данните си.</p>
+
+  <form #contactForm="ngForm" (ngSubmit)="onSubmit(contactForm)" class="notify-form">
+    <div class="two-col">
+      <input type="text" name="firstName" ngModel placeholder="Име" required />
+      <input type="text" name="lastName" ngModel placeholder="Фамилия" required />
+    </div>
+    <input type="email" name="email" ngModel placeholder="Имейл" required />
+    <input type="tel" name="phone" ngModel placeholder="Телефон" />
+    <textarea name="message" rows="4" ngModel placeholder="Съобщение" required></textarea>
+    <button type="submit" [disabled]="contactForm.invalid">Изпрати</button>
+  </form>
+
+  <p *ngIf="submitted" class="success-msg">Благодарим! Ще се свържем с вас скоро.</p>
+</section>
