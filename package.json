@@ -1,0 +1,32 @@
+{
+  "scripts": {
+    "start": "ts-node-dev src/app.ts",
+    "build": "tsc -p .",
+    "test": "jest",
+    "dev:app": "tsx watch --clear-screen=false src/app.ts",
+    "dev:worker-big": "WORKER_ID=worker-big PREFER_LARGE_ORDERS=true tsx watch --clear-screen=false src/worker.ts",
+    "dev:worker-small": "WORKER_ID=worker-small PREFER_LARGE_ORDERS=false tsx watch --clear-screen=false src/worker.ts"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/cron": "^2.0.1",
+    "@types/express": "5.0.1",
+    "ts-node-dev": "^2.0.0"
+  },
+  "dependencies": {
+    "@ipi-soft/logger": "^1.2.0",
+    "archiver": "7.0.1",
+    "axios": "1.9.0",
+    "bcryptjs": "3.0.2",
+    "cors": "^2.8.5",
+    "cron": "^4.3.3",
+    "dotenv": "16.5.0",
+    "express": "5.1.0",
+    "handlebars": "4.7.8",
+    "jsonwebtoken": "9.0.2",
+    "mailtrap": "^3.3.0",
+    "mongoose": "8.13.3",
+    "node-cron": "^4.2.1",
+    "nodemailer": "6.10.1"
+  }
+}
