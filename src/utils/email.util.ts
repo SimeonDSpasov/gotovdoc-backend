@@ -1,12 +1,13 @@
 import fs from 'fs';
 import path from 'path';
-import { MailtrapClient } from 'mailtrap';
+import nodemailer from 'nodemailer';
 
 import handlebars from 'handlebars';
 
 import ErrorUtil from './../utils/error.util';
 
 import Config from './../config';
+import CustomError from './custom-error.utils';
 
 export enum EmailType {
   Info,
@@ -26,10 +27,15 @@ export class EmailUtil {
 
   private config = Config.getInstance();
 
-  private client = new MailtrapClient({ token: this.config.emailKey });
-
-  private sender = { name: "Mailtrap Test", email: 'info@cyberninjas.app' };
-
+  private transporter = nodemailer.createTransport({
+    host: 'iron.superhosting.bg',
+    port: 465, // SSL/TLS
+    secure: true, // true за порт 465
+    auth: {
+      user: 'info@gotovdoc.bg',
+      pass: this.config.emailPassword, // паролата от cPanel
+    },
+  });
 
   public async sendEmail(data: EmailData, type: EmailType, logContext: string): Promise<void> {
 
@@ -45,46 +51,14 @@ export class EmailUtil {
 
     const compiledTemplate = handlebars.compile(main);
 
-    const logoPath = path.join(__dirname, './../assets/img/logo.ico');
-    const logoImage = fs.readFileSync(logoPath);
-
-    const twitterPath = path.join(__dirname, './../assets/img/twitter.png');
-    const twitterImage = fs.readFileSync(twitterPath);
-
-    const discordPath = path.join(__dirname, './../assets/img/discord.png');
-    const discordImage = fs.readFileSync(discordPath);
-
-    await this.client
-      .send({
-      from: { name: 'Gotovdoc', email: accountEmail },
-      to: [{ email: data.toEmail }],
+    await this.transporter.sendMail({
+      from: `${accountEmail}`,
+      to: `info@gotovdoc.bg`,
       subject: data.subject,
       html: compiledTemplate(data.payload),
-      attachments: [
-        {
-          filename: 'logo.png',
-          disposition: "inline",
-          content: logoImage,
-          content_id: 'logo',
-        },
-        {
-          filename: 'twitter.png',
-          disposition: "inline",
-          content: twitterImage,
-          content_id: 'twitter',
-        },
-        {
-          filename: 'discord.png',
-          disposition: "inline",
-          content: discordImage,
-          content_id: 'discord',
-        },
-
-      ],
-      })
-    .then()
-    .catch((err) => { logger.error(err.message, this.logContext, false) });
-
+    }).catch((err: Error) => {
+      throw new CustomError(500, err.message, `${logContext}`, false);
+    });
   }
 
   private static instance: EmailUtil;

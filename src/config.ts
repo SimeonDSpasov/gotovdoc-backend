@@ -35,7 +35,7 @@ export default class Config {
   }
 
   // Email
-  public emailKey = process.env.MAILTRAP_KEY || '';
+  public emailPassword = process.env.EMAIL_PASSWORD || '';
 
   public get infoAccountEmail(): string {
     return {

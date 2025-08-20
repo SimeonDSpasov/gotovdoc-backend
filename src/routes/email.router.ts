@@ -9,6 +9,6 @@ const emailController = new EmailController();
 
 const EmailRouter = Router();
 
-EmailRouter.get('/', () => {});
+EmailRouter.post('/contact-us', useCatch(emailController.contactUs));
 
 export default EmailRouter;
