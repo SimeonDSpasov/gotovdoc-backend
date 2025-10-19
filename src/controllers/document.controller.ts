@@ -70,6 +70,8 @@ export default class DocumentController {
         "/usr/bin/soffice",
         "/usr/local/bin/soffice",
         "/usr/lib/libreoffice/program/soffice",
+        "/usr/bin/libreoffice",
+        "/usr/local/bin/libreoffice",
       ].filter(Boolean) as string[];
       return candidates;
     };
@@ -86,7 +88,7 @@ export default class DocumentController {
           tmpOptions: {},
           asyncOptions: { times: 2, interval: 500 },
           sofficeBinaryPaths: getSofficeBinaryPaths(),
-          fileName: "speciment.docx",
+          fileName: "speciment",
         } as const;
 
         log("Starting conversion to PDF", { sofficeCandidates: options.sofficeBinaryPaths });
@@ -95,7 +97,7 @@ export default class DocumentController {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (libre as any).convertWithOptions(
           inputBuffer,
-          ".pdf",
+          "pdf",
           undefined,
           options,
           (err: unknown, output: unknown) => {
