@@ -1,4 +1,4 @@
 [phases.install]
-aptPkgs = ['libreoffice']
+aptPkgs = ['libreoffice', 'fontconfig', 'fonts-dejavu', 'fonts-liberation', 'fonts-noto-core']
 
 

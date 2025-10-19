@@ -20,8 +20,10 @@ install_apt() {
     libreoffice \
     libreoffice-writer \
     libreoffice-core \
-    fonts-dejavu fonts-liberation \
+    fonts-dejavu fonts-liberation fonts-noto-core \
     fontconfig
+  # Optional PDF tools (non-fatal if missing)
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y qpdf ghostscript >/dev/null 2>&1 || true
 }
 
 install_yum_dnf() {
@@ -31,6 +33,13 @@ install_yum_dnf() {
     installer="dnf"
   fi
   log "Detected ${installer}-based distro. Installing LibreOffice..."
+  # Try enabling EPEL or CRB where applicable to get LibreOffice
+  if [ "${installer}" = "yum" ]; then
+    sudo yum -y install epel-release >/dev/null 2>&1 || true
+  else
+    sudo dnf -y install epel-release >/dev/null 2>&1 || true
+    sudo dnf config-manager --set-enabled crb >/dev/null 2>&1 || true
+  fi
   sudo ${installer} -y install fontconfig
   # Try headless first (preferred on servers), fall back to full package
   if sudo ${installer} -y install libreoffice-headless; then
@@ -39,19 +48,21 @@ install_yum_dnf() {
     sudo ${installer} -y install libreoffice
   fi
   # Common fonts for better PDF rendering (ignore if unavailable)
-  sudo ${installer} -y install dejavu-sans-fonts dejavu-serif-fonts >/dev/null 2>&1 || true
+  sudo ${installer} -y install dejavu-sans-fonts dejavu-serif-fonts google-noto-sans-cjk-ttc-fonts google-noto-sans-fonts >/dev/null 2>&1 || true
+  # Optional PDF tools
+  sudo ${installer} -y install qpdf ghostscript >/dev/null 2>&1 || true
 }
 
 install_apk() {
   log "Detected Alpine (apk). Installing LibreOffice..."
   sudo apk update
-  sudo apk add --no-cache libreoffice libreoffice-writer fontconfig ttf-dejavu
+  sudo apk add --no-cache libreoffice libreoffice-writer fontconfig ttf-dejavu ttf-liberation
 }
 
 install_zypper() {
   log "Detected zypper-based distro. Installing LibreOffice..."
   sudo zypper refresh
-  sudo zypper --non-interactive install libreoffice libreoffice-writer fontconfig dejavu-fonts
+  sudo zypper --non-interactive install libreoffice libreoffice-writer fontconfig dejavu-fonts noto-sans-fonts
 }
 
 ensure_soffice() {

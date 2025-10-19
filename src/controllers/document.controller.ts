@@ -53,14 +53,48 @@ export default class DocumentController {
   
     const filledDocx = doc.getZip().generate({ type: "nodebuffer" });
   
-    // Convert DOCX → PDF using libreoffice-convert (promisified)
+    // Convert DOCX → PDF using libreoffice-convert with explicit options
+    const getSofficeBinaryPaths = (): string[] => {
+      const candidates = [
+        process.env.LIBREOFFICE_PATH,
+        "/usr/bin/soffice",
+        "/usr/local/bin/soffice",
+        "/usr/lib/libreoffice/program/soffice",
+      ].filter(Boolean) as string[];
+      return candidates;
+    };
+
+    const isValidPdf = (buffer: Buffer): boolean => {
+      if (!buffer || buffer.length < 1000) return false; // likely truncated/corrupt
+      const header = buffer.subarray(0, 5).toString();
+      return header === "%PDF-";
+    };
+
     const convertToPdf = (inputBuffer: Buffer): Promise<Buffer> =>
       new Promise((resolve, reject) => {
-        libre.convert(inputBuffer, ".pdf", undefined, (err: unknown, done: unknown) => {
-          if (err) return reject(err);
+        const options = {
+          tmpOptions: {},
+          asyncOptions: { times: 2, interval: 500 },
+          sofficeBinaryPaths: getSofficeBinaryPaths(),
+          fileName: "speciment.docx",
+        } as const;
 
-          resolve(done as Buffer);
-        });
+        // Prefer convertWithOptions for better control
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (libre as any).convertWithOptions(
+          inputBuffer,
+          ".pdf",
+          undefined,
+          options,
+          (err: unknown, output: unknown) => {
+            if (err) return reject(err as Error);
+            const outBuffer = output as Buffer;
+            if (!isValidPdf(outBuffer)) {
+              return reject(new Error("Generated PDF failed validation (missing %PDF- header or too small)."));
+            }
+            resolve(outBuffer);
+          }
+        );
       });
 
     const pdfBuffer = await convertToPdf(filledDocx).catch((err) => {
