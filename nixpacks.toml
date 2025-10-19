@@ -1,0 +1,4 @@
+[phases.install]
+aptPkgs = ['libreoffice']
+
+
