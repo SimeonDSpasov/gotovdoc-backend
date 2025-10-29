@@ -8,13 +8,9 @@ import CustomError from '../utils/custom-error.utils';
 
 // import { EmailType, EmailUtil } from './../utils/email.util';
 
-import UserDataLayer from '../data-layers/user.data-layer';
-
-import { IUser } from '../models/user.model';
-
 import { EmailType, EmailUtil } from './../utils/email.util';
 
-import Config from '../config';
+import Config from './../config';
 
 export default class EmailController {
   

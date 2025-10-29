@@ -2,11 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const fontkit = require('@pdf-lib/fontkit');
+import fontkit from '@pdf-lib/fontkit';
+
 import sharp from 'sharp';
 
 export class PdfFooterUtil {
+
   private static initialized = false;
   private static logoPngCache?: Buffer;
   private static unicodeFontBytes?: Buffer;
@@ -15,11 +16,14 @@ export class PdfFooterUtil {
 
   private static async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
+
     // Warm caches synchronously at first call
     if (fs.existsSync(this.logoSvgPath)) {
       const logoSvg = fs.readFileSync(this.logoSvgPath);
+  
       this.logoPngCache = await sharp(logoSvg).png().toBuffer();
     }
+
     if (fs.existsSync(this.unicodeFontPath)) {
       this.unicodeFontBytes = fs.readFileSync(this.unicodeFontPath);
     }
@@ -28,7 +32,9 @@ export class PdfFooterUtil {
 
   public static async addFooter(pdfBuffer: Buffer): Promise<Buffer> {
     await this.ensureInitialized();
+
     const pdfDoc = await PDFDocument.load(pdfBuffer);
+
     (pdfDoc as any).registerFontkit(fontkit);
 
     // Embed logo (use cached PNG buffer)
@@ -57,6 +63,7 @@ export class PdfFooterUtil {
 
       const logoX = leftPadding;
       const logoY = bottomPadding;
+
       if (pngImage) {
         page.drawImage(pngImage, { x: logoX, y: logoY, width: logoTargetWidth, height: logoTargetHeight });
       }
@@ -72,6 +79,7 @@ export class PdfFooterUtil {
 
       if (computedWidth > maxTextWidth) {
         const scale = maxTextWidth / computedWidth;
+
         fontSize = Math.max(7, Math.floor(baseFontSize * scale));
         computedWidth = fontToUse.widthOfTextAtSize(text, fontSize);
       }
@@ -83,6 +91,7 @@ export class PdfFooterUtil {
 
     return Buffer.from(await pdfDoc.save());
   }
+
 }
 
 export default PdfFooterUtil;

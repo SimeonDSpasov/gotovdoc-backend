@@ -25,13 +25,13 @@ export default class Config {
   public get frontendUrl(): string {
     return {
       dev: 'http://localhost:4200',
-      test: 'https://test.dripnat.com',
-      prod: 'https://dripnat.com',
+      test: 'https://gotovdoc.com',
+      prod: 'https://gotovdoc.com',
     }[this.env];
   };
 
   public databases = {
-    main: `drip-node-${this.env}`,
+    main: `gotovdoc-${this.env}`,
   }
 
   // Email
@@ -52,7 +52,6 @@ export default class Config {
       prod: 'support@gotovdoc.bg',
     }[this.env];
   }
-
 
   private static instance: Config;
 
