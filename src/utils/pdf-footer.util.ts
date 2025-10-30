@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { Readable } from 'stream';
 
 import fontkit from '@pdf-lib/fontkit';
 
@@ -90,6 +91,19 @@ export class PdfFooterUtil {
     }
 
     return Buffer.from(await pdfDoc.save());
+  }
+
+  private static async streamToBuffer(stream: Readable): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  public static async addFooterFromStream(stream: Readable): Promise<Buffer> {
+    const buffer = await this.streamToBuffer(stream);
+    return this.addFooter(buffer);
   }
 
 }

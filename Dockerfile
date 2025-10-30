@@ -7,9 +7,13 @@ RUN apt-get update && apt-get install -y \
   fonts-dejavu \
   fonts-liberation \
   fonts-noto-core \
+  python3-uno \
+  unoconv \
+  procps \
   && rm -rf /var/lib/apt/lists/*
 
-ENV LIBREOFFICE_PATH=/usr/bin/soffice
+ENV LIBREOFFICE_PATH=/usr/bin/soffice \
+    LIBREOFFICE_CONNECTION="socket,host=127.0.0.1,port=2002;urp;StarOffice.ComponentContext"
 
 WORKDIR /app
 ENV PATH="/app/node_modules/.bin:${PATH}"
