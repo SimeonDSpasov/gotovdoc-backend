@@ -6,7 +6,8 @@ import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import PQueue from 'p-queue';
 import logger from '@ipi-soft/logger';
-import PdfFooterUtil from '../utils/pdf-footer.util';
+// Footer disabled for performance testing
+// import PdfFooterUtil from '../utils/pdf-footer.util';
 import LibreOfficeConverter from '../utils/libreoffice-converter.util';
 import TemplateCacheUtil from '../utils/template-cache.util';
 
@@ -21,10 +22,7 @@ export default class DocumentController {
     const message = err instanceof Error ? err.message : String(err);
     logger.error(message, 'DocumentController -> TemplateCache preload');
   });
-  private static readonly warmFooter = PdfFooterUtil.preload().catch((err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err);
-    logger.error(message, 'DocumentController -> PdfFooterUtil.preload');
-  });
+  private static readonly warmFooter = Promise.resolve();
 
   private static conversionQueue = new PQueue({
     concurrency: Number(process.env.DOC_CONVERSION_CONCURRENCY ?? 1) || 1,
@@ -69,19 +67,10 @@ export default class DocumentController {
       throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${this.logContext} -> convertToPdf`);
     }
 
-    const finalizedPdf = await PdfFooterUtil.addFooterFromStream(pdfStream).catch((err) => {
-      throw new CustomError(500, (err as Error)?.message, `${this.logContext} -> addFooter`);
-    });
-
-    if (!finalizedPdf) {
-      throw new CustomError(500, 'Failed to add footer to PDF', `${this.logContext} -> addFooter`);
-    }
-
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="document.pdf"`);
 
-    const stream = Readable.from(finalizedPdf);
-    await pipeline(stream, res);
+    await pipeline(pdfStream, res);
   }
 
   private static renderTemplate(templateBuffer: Buffer, data: Record<string, unknown>): Buffer {
