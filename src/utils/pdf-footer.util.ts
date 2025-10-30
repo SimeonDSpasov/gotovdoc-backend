@@ -31,6 +31,10 @@ export class PdfFooterUtil {
     this.initialized = true;
   }
 
+  public static async preload(): Promise<void> {
+    await this.ensureInitialized();
+  }
+
   public static async addFooter(pdfBuffer: Buffer): Promise<Buffer> {
     await this.ensureInitialized();
 

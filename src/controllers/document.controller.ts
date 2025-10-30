@@ -7,6 +7,7 @@ import Docxtemplater from "docxtemplater";
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import PQueue from 'p-queue';
+import logger from '@ipi-soft/logger';
 import PdfFooterUtil from '../utils/pdf-footer.util';
 import LibreOfficeConverter from '../utils/libreoffice-converter.util';
 
@@ -15,6 +16,13 @@ import CustomError from '../utils/custom-error.utils';
 export default class DocumentController {
   
   private logContext = 'Document Controller';
+
+  private static readonly templatePath = path.join(process.cwd(), "src/assets/docs", "speciment.docx");
+  private static readonly templateBuffer = DocumentController.loadTemplate();
+  private static readonly warmFooter = PdfFooterUtil.preload().catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error(message, 'DocumentController -> PdfFooterUtil.preload');
+  });
 
   private static conversionQueue = new PQueue({
     concurrency: Number(process.env.DOC_CONVERSION_CONCURRENCY ?? 1) || 1,
@@ -29,14 +37,7 @@ export default class DocumentController {
       throw new CustomError(400, 'Missing fields: three_names | egn | id_number | id_year | id_issuer | company_name | company_adress');
     }
   
-    const templatePath = path.join(process.cwd(), "src/assets/docs", "speciment.docx");
-
-    const content = fs.readFileSync(templatePath);
-
-    const zip = new PizZip(content);
-    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-
-    doc.render({
+    const filledDocx = DocumentController.renderTemplate({
       three_names,
       egn,
       id_number,
@@ -45,8 +46,6 @@ export default class DocumentController {
       company_name,
       company_adress,
     });
-  
-    const filledDocx = doc.getZip().generate({ type: "nodebuffer" });
   
     let pdfStream: Readable;
     try {
@@ -76,4 +75,20 @@ export default class DocumentController {
     await pipeline(stream, res);
   }
 
+  private static loadTemplate(): Buffer {
+    try {
+      return fs.readFileSync(this.templatePath);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error(message, 'DocumentController -> loadTemplate');
+      throw err;
+    }
+  }
+
+  private static renderTemplate(data: Record<string, unknown>): Buffer {
+    const zip = new PizZip(this.templateBuffer);
+    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+    doc.render(data);
+    return doc.getZip().generate({ type: "nodebuffer" });
+  }
 }
