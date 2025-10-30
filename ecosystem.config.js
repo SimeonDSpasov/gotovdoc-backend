@@ -18,7 +18,7 @@ module.exports = {
     {
       name: 'worker-1',
       script: scriptApp,
-      exec_mode: 'fork',
+      exec_mode: 'cluster',
       instances: 1,
       env_test,
       env_prod,
@@ -26,14 +26,14 @@ module.exports = {
         WORKER_ID: 'worker-1',
       },
       interpreter: 'node',
-      interpreter_args: '--max-old-space-size=4096',
+      interpreter_args: '--max-old-space-size=2048',
     },
 
     // Worker 2 – Small Orders
     {
       name: 'worker-2',
       script: scriptApp,
-      exec_mode: 'fork',
+      exec_mode: 'cluster',
       instances: 1,
       env_test,
       env_prod,
@@ -41,7 +41,33 @@ module.exports = {
         WORKER_ID: 'worker-2',
       },
       interpreter: 'node',
-      interpreter_args: '--max-old-space-size=4096',
+      interpreter_args: '--max-old-space-size=2048',
+    },
+    {
+      name: 'worker-3',
+      script: scriptApp,
+      exec_mode: 'cluster',
+      instances: 1,
+      env_test,
+      env_prod,
+      env: {
+        WORKER_ID: 'worker-3',
+      },
+      interpreter: 'node',
+      interpreter_args: '--max-old-space-size=2048',
+    },
+    {
+      name: 'worker-4',
+      script: scriptApp,
+      exec_mode: 'cluster',
+      instances: 1,
+      env_test,
+      env_prod,
+      env: {
+        WORKER_ID: 'worker-4',
+      },
+      interpreter: 'node',
+      interpreter_args: '--max-old-space-size=2048',
     },
   ],
 };
