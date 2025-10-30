@@ -6,6 +6,7 @@ import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
+import PQueue from 'p-queue';
 import PdfFooterUtil from '../utils/pdf-footer.util';
 import LibreOfficeConverter from '../utils/libreoffice-converter.util';
 
@@ -14,6 +15,12 @@ import CustomError from '../utils/custom-error.utils';
 export default class DocumentController {
   
   private logContext = 'Document Controller';
+
+  private static conversionQueue = new PQueue({
+    concurrency: Number(process.env.DOC_CONVERSION_CONCURRENCY ?? 1) || 1,
+  });
+
+  private static conversionTimeoutMs = Number(process.env.DOC_CONVERSION_TIMEOUT_MS ?? 120000) || 120000;
 
   public generateSpeciment: RequestHandler = async (req, res) => {
     const { three_names, egn, id_number, id_year, id_issuer, company_name, company_adress } = req.body;
@@ -41,12 +48,17 @@ export default class DocumentController {
   
     const filledDocx = doc.getZip().generate({ type: "nodebuffer" });
   
-    const pdfStream = await LibreOfficeConverter.docxBufferToPdfStream(filledDocx).catch((err) => {
-      throw new CustomError(500, (err as Error)?.message, `${this.logContext} -> convertToPdf`);
-    });
-
-    if (!pdfStream) {
-      throw new CustomError(500, 'Failed to convert DOCX to PDF', `${this.logContext} -> convertToPdf`);
+    let pdfStream: Readable;
+    try {
+      pdfStream = await DocumentController.conversionQueue.add(
+        () => LibreOfficeConverter.docxBufferToPdfStream(filledDocx),
+        {
+          timeout: DocumentController.conversionTimeoutMs,
+          throwOnTimeout: true,
+        },
+      );
+    } catch (err) {
+      throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${this.logContext} -> convertToPdf`);
     }
 
     const finalizedPdf = await PdfFooterUtil.addFooterFromStream(pdfStream).catch((err) => {
