@@ -30,8 +30,10 @@ export default class AppServer {
 
     app.use(new ErrorMiddleware().init);
 
+    const workerId = process.env.WORKER_ID || `worker-${Math.floor(Math.random() * 10000)}`;
+
     app.listen(this.config.server.port, () => {
-      logger.info('Server Started');
+      logger.info(`${workerId} Server Started`);
     });
   }
 

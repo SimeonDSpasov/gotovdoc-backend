@@ -2,3 +2,10 @@
 aptPkgs = ['libreoffice', 'fontconfig', 'fonts-dejavu', 'fonts-liberation', 'fonts-noto-core']
 
 
+[phases.build]
+cmds = [
+  'npm run build',
+  'sh -lc "if [ -n \"$PM2_PUBLIC_KEY\" ] && [ -n \"$PM2_SECRET_KEY\" ]; then npx pm2 link \"$PM2_PUBLIC_KEY\" \"$PM2_SECRET_KEY\"; else echo \"PM2 keys not set, skipping pm2 link\"; fi"'
+]
+
+
