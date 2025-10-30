@@ -28,6 +28,7 @@
     "express": "5.1.0",
     "handlebars": "4.7.8",
     "jsonwebtoken": "9.0.2",
+    "ioredis": "^5.4.1",
     "mailtrap": "^3.3.0",
     "p-queue": "^7.4.1",
     "mongoose": "8.13.3",

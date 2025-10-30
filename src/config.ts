@@ -34,6 +34,11 @@ export default class Config {
     main: `gotovdoc-${this.env}`,
   }
 
+  public redis = {
+    url: process.env.REDIS_URL || '',
+    keyPrefix: process.env.REDIS_KEY_PREFIX || 'gotovdoc',
+  }
+
   // Email
   public emailPassword = process.env.EMAIL_PASSWORD || '';
 

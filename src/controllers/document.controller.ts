@@ -1,7 +1,5 @@
 import { RequestHandler } from 'express';
 
-import fs from 'fs';
-import path from 'path';
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { Readable } from 'stream';
@@ -10,6 +8,7 @@ import PQueue from 'p-queue';
 import logger from '@ipi-soft/logger';
 import PdfFooterUtil from '../utils/pdf-footer.util';
 import LibreOfficeConverter from '../utils/libreoffice-converter.util';
+import TemplateCacheUtil from '../utils/template-cache.util';
 
 import CustomError from '../utils/custom-error.utils';
 
@@ -17,8 +16,11 @@ export default class DocumentController {
   
   private logContext = 'Document Controller';
 
-  private static readonly templatePath = path.join(process.cwd(), "src/assets/docs", "speciment.docx");
-  private static readonly templateBuffer = DocumentController.loadTemplate();
+  private static readonly templateName = 'speciment.docx';
+  private static readonly warmTemplate = TemplateCacheUtil.preload(DocumentController.templateName).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error(message, 'DocumentController -> TemplateCache preload');
+  });
   private static readonly warmFooter = PdfFooterUtil.preload().catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     logger.error(message, 'DocumentController -> PdfFooterUtil.preload');
@@ -37,7 +39,14 @@ export default class DocumentController {
       throw new CustomError(400, 'Missing fields: three_names | egn | id_number | id_year | id_issuer | company_name | company_adress');
     }
   
-    const filledDocx = DocumentController.renderTemplate({
+    await Promise.allSettled([
+      DocumentController.warmTemplate,
+      DocumentController.warmFooter,
+    ]);
+
+    const templateBuffer = await TemplateCacheUtil.getTemplate(DocumentController.templateName);
+
+    const filledDocx = DocumentController.renderTemplate(templateBuffer, {
       three_names,
       egn,
       id_number,
@@ -75,18 +84,8 @@ export default class DocumentController {
     await pipeline(stream, res);
   }
 
-  private static loadTemplate(): Buffer {
-    try {
-      return fs.readFileSync(this.templatePath);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      logger.error(message, 'DocumentController -> loadTemplate');
-      throw err;
-    }
-  }
-
-  private static renderTemplate(data: Record<string, unknown>): Buffer {
-    const zip = new PizZip(this.templateBuffer);
+  private static renderTemplate(templateBuffer: Buffer, data: Record<string, unknown>): Buffer {
+    const zip = new PizZip(templateBuffer);
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
     doc.render(data);
     return doc.getZip().generate({ type: "nodebuffer" });
