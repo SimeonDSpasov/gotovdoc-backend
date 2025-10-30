@@ -25,8 +25,8 @@ export default class Config {
   public get frontendUrl(): string {
     return {
       dev: 'http://localhost:4200',
-      test: 'https://gotovdoc.com',
-      prod: 'https://gotovdoc.com',
+      test: 'https://gotovdoc.bg',
+      prod: 'https://gotovdoc.bg',
     }[this.env];
   };
 
