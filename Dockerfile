@@ -9,10 +9,10 @@ RUN apt-get update && apt-get install -y \
   fonts-noto-core \
   && rm -rf /var/lib/apt/lists/*
 
-ENV NODE_ENV=production \
-    LIBREOFFICE_PATH=/usr/bin/soffice
+ENV LIBREOFFICE_PATH=/usr/bin/soffice
 
 WORKDIR /app
+ENV PATH="/app/node_modules/.bin:${PATH}"
 
 # Install dependencies (including devDependencies for build)
 COPY package*.json ./
@@ -24,6 +24,8 @@ RUN npm run build
 
 # Remove devDependencies after build
 RUN npm prune --omit=dev
+
+ENV NODE_ENV=production
 
 # Expose default port (adjust if needed)
 EXPOSE 3000

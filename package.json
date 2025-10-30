@@ -13,7 +13,7 @@
     "@types/express": "5.0.1",
     "@types/nodemailer": "^6.4.19",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@ipi-soft/logger": "^1.2.0",
