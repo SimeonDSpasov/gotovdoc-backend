@@ -4,7 +4,6 @@ import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
-import PQueue from 'p-queue';
 import logger from '@ipi-soft/logger';
 // Footer disabled for performance testing
 // import PdfFooterUtil from '../utils/pdf-footer.util';
@@ -23,12 +22,6 @@ export default class DocumentController {
     logger.error(message, 'DocumentController -> TemplateCache preload');
   });
   private static readonly warmFooter = Promise.resolve();
-
-  private static conversionQueue = new PQueue({
-    concurrency: Number(process.env.DOC_CONVERSION_CONCURRENCY ?? 1) || 1,
-  });
-
-  private static conversionTimeoutMs = Number(process.env.DOC_CONVERSION_TIMEOUT_MS ?? 120000) || 120000;
 
   public generateSpeciment: RequestHandler = async (req, res) => {
     const { three_names, egn, id_number, id_year, id_issuer, company_name, company_adress } = req.body;
@@ -56,13 +49,7 @@ export default class DocumentController {
   
     let pdfStream: Readable;
     try {
-      pdfStream = await DocumentController.conversionQueue.add(
-        () => LibreOfficeConverter.docxBufferToPdfStream(filledDocx),
-        {
-          timeout: DocumentController.conversionTimeoutMs,
-          throwOnTimeout: true,
-        },
-      );
+      pdfStream = await LibreOfficeConverter.docxBufferToPdfStream(filledDocx);
     } catch (err) {
       throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${this.logContext} -> convertToPdf`);
     }
