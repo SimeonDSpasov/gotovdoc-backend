@@ -1,6 +1,11 @@
 const scriptApp = './dist/app.js';
 const scriptWorker = './dist/worker.js';
 
+const env_dev = {
+  NODE_ENV: 'development',
+  Project_ENV: 'dev'
+};
+
 const env_test = {
   NODE_ENV: 'production',
   Project_ENV: 'test'
@@ -20,6 +25,7 @@ module.exports = {
       script: scriptApp,
       exec_mode: 'cluster',
       instances: 1,
+      env_dev,
       env_test,
       env_prod,
       env: {
@@ -35,8 +41,10 @@ module.exports = {
       script: scriptApp,
       exec_mode: 'cluster',
       instances: 1,
+      env_dev,
       env_test,
       env_prod,
+
       env: {
         WORKER_ID: 'worker-2',
       },
@@ -49,7 +57,9 @@ module.exports = {
       exec_mode: 'cluster',
       instances: 1,
       env_test,
+      env_dev,
       env_prod,
+      env_dev,
       env: {
         WORKER_ID: 'worker-3',
       },
@@ -61,6 +71,7 @@ module.exports = {
       script: scriptApp,
       exec_mode: 'cluster',
       instances: 1,
+      env_dev,
       env_test,
       env_prod,
       env: {

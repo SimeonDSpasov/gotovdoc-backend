@@ -11,10 +11,13 @@ import LibreOfficeConverter from '../utils/libreoffice-converter.util';
 import TemplateCacheUtil from '../utils/template-cache.util';
 
 import CustomError from '../utils/custom-error.utils';
+import DocumentDataLayer from '../data-layers/document.data-layer';
+import { DocumentType } from '../models/document.model';
 
 export default class DocumentController {
   
   private logContext = 'Document Controller';
+  private documentDataLayer = DocumentDataLayer.getInstance();
 
   private static readonly templateName = 'speciment.docx';
   private static readonly warmTemplate = TemplateCacheUtil.preload(DocumentController.templateName).catch((err: unknown) => {
@@ -24,20 +27,13 @@ export default class DocumentController {
   private static readonly warmFooter = Promise.resolve();
 
   public generateSpeciment: RequestHandler = async (req, res) => {
-    const { three_names, egn, id_number, id_year, id_issuer, company_name, company_adress } = req.body;
+    const { three_names, egn, id_number, id_year, id_issuer, company_name, company_adress, email } = req.body;
 
-    if (!three_names || !egn || !id_number || !id_year || !id_issuer || !company_name || !company_adress) {
-      throw new CustomError(400, 'Missing fields: three_names | egn | id_number | id_year | id_issuer | company_name | company_adress');
+    if (!three_names || !egn || !id_number || !id_year || !id_issuer || !company_name || !company_adress || !email) {
+      throw new CustomError(400, 'Missing fields: three_names | egn | id_number | id_year | id_issuer | company_name | company_adress | email');
     }
   
-    await Promise.allSettled([
-      DocumentController.warmTemplate,
-      DocumentController.warmFooter,
-    ]);
-
-    const templateBuffer = await TemplateCacheUtil.getTemplate(DocumentController.templateName);
-
-    const filledDocx = DocumentController.renderTemplate(templateBuffer, {
+    const documentData = {
       three_names,
       egn,
       id_number,
@@ -45,7 +41,28 @@ export default class DocumentController {
       id_issuer,
       company_name,
       company_adress,
-    });
+    };
+
+    await this.documentDataLayer.create(
+      {
+        type: DocumentType.Speciment,
+        data: documentData,
+        orderData: {
+          email,
+          cost: 0,
+        },
+      },
+      this.logContext
+    );
+
+    await Promise.allSettled([
+      DocumentController.warmTemplate,
+      DocumentController.warmFooter,
+    ]);
+
+    const templateBuffer = await TemplateCacheUtil.getTemplate(DocumentController.templateName);
+
+    const filledDocx = DocumentController.renderTemplate(templateBuffer, documentData);
   
     let pdfStream: Readable;
     try {

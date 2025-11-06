@@ -13,7 +13,8 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 ENV LIBREOFFICE_PATH=/usr/bin/soffice \
-    LIBREOFFICE_CONNECTION="socket,host=127.0.0.1,port=2002;urp;StarOffice.ComponentContext"
+    LIBREOFFICE_CONNECTION="socket,host=127.0.0.1,port=2002;urp;StarOffice.ComponentContext" \
+    DOCKER_CONTAINER="true"
 
 WORKDIR /app
 ENV PATH="/app/node_modules/.bin:${PATH}"

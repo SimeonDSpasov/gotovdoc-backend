@@ -1,6 +1,10 @@
 {
   "scripts": {
-    "start": "pm2 start ecosystem.config.js --env prod && pm2 logs",
+    "start:prod": "pm2 start ecosystem.config.js --env prod && pm2 logs",
+    "start": "bash scripts/start-dev.sh",
+    "stop": "bash scripts/stop-dev.sh",
+    "restart": "npm run stop && npm run start",
+    "start:simple": "pm2 start ecosystem.config.js --env dev && pm2 logs",
     "build": "tsc -p .",
     "test": "jest",
     "dev:app": "tsx watch --clear-screen=false src/app.ts",
