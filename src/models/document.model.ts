@@ -36,6 +36,12 @@ export interface DocumentOrder {
   userId?: ObjectId;
   email: string;
   cost: number;
+  paid?: boolean;
+  paymentLinkId?: string;
+  paidAt?: Date;
+  failedAt?: Date;
+  amount?: number;
+  currency?: string;
 }
 
 interface IDocument {

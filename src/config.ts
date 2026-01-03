@@ -58,6 +58,16 @@ export default class Config {
     }[this.env];
   }
 
+  // MyPOS Configuration
+  public mypos = {
+    clientId: process.env.MYPOS_CLIENT_ID || '',
+    clientSecret: process.env.MYPOS_CLIENT_SECRET || '',
+    isProduction: this.env === 'prod',
+    successUrl: process.env.MYPOS_SUCCESS_URL || `${this.frontendUrl}/payment/success`,
+    cancelUrl: process.env.MYPOS_CANCEL_URL || `${this.frontendUrl}/payment/cancel`,
+    webhookSecret: process.env.MYPOS_WEBHOOK_SECRET || '',
+  };
+
   private static instance: Config;
 
   public static getInstance(): Config {

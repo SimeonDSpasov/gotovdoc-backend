@@ -13,11 +13,13 @@ import TemplateCacheUtil from '../utils/template-cache.util';
 import CustomError from '../utils/custom-error.utils';
 import DocumentDataLayer from '../data-layers/document.data-layer';
 import { DocumentType } from '../models/document.model';
+import MyPosService from '../services/mypos.service';
 
 export default class DocumentController {
   
   private logContext = 'Document Controller';
   private documentDataLayer = DocumentDataLayer.getInstance();
+  private myposService = MyPosService.getInstance();
 
   private static readonly templateName = 'speciment.docx';
   private static readonly warmTemplate = TemplateCacheUtil.preload(DocumentController.templateName).catch((err: unknown) => {
@@ -43,17 +45,56 @@ export default class DocumentController {
       company_adress,
     };
 
-    await this.documentDataLayer.create(
+    // Create document in database
+    const document = await this.documentDataLayer.create(
       {
         type: DocumentType.Speciment,
         data: documentData,
         orderData: {
           email,
-          cost: 0,
+          cost: 10, // 10 BGN for specimen document
         },
       },
       this.logContext
     );
+
+    // Generate payment link
+    let paymentUrl: string;
+    try {
+      const paymentLink = await this.myposService.createPaymentLink({
+        amount: 10,
+        currency: 'BGN',
+        order_id: document.id,
+        customer_email: email,
+        customer_name: three_names,
+        note: `Specimen Document for ${three_names}`,
+      });
+
+      paymentUrl = paymentLink.payment_url;
+      logger.info(`Payment link generated: ${paymentUrl}`, this.logContext);
+    } catch (err) {
+      logger.error((err as Error)?.message || 'Failed to create payment link', this.logContext);
+      throw new CustomError(500, 'Failed to create payment link');
+    }
+
+    // Return payment URL to frontend instead of PDF
+    res.json({
+      success: true,
+      orderId: document.id,
+      paymentUrl,
+      message: 'Please complete payment to download your document',
+    });
+  }
+
+  public downloadDocument: RequestHandler = async (req, res) => {
+    const { orderId } = req.params;
+
+    // Verify payment was completed
+    const document = await this.documentDataLayer.getById(orderId, this.logContext);
+
+    if (!(document.orderData as any)?.paid) {
+      throw new CustomError(403, 'Payment required to download document');
+    }
 
     await Promise.allSettled([
       DocumentController.warmTemplate,
@@ -61,8 +102,7 @@ export default class DocumentController {
     ]);
 
     const templateBuffer = await TemplateCacheUtil.getTemplate(DocumentController.templateName);
-
-    const filledDocx = DocumentController.renderTemplate(templateBuffer, documentData);
+    const filledDocx = DocumentController.renderTemplate(templateBuffer, document.data);
   
     let pdfStream: Readable;
     try {
@@ -72,7 +112,7 @@ export default class DocumentController {
     }
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="document.pdf"`);
+    res.setHeader("Content-Disposition", `attachment; filename="specimen-document.pdf"`);
 
     await pipeline(pdfStream, res);
   }
