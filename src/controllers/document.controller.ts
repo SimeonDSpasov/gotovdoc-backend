@@ -29,10 +29,10 @@ export default class DocumentController {
   private static readonly warmFooter = Promise.resolve();
 
   public generateSpeciment: RequestHandler = async (req, res) => {
-    const { three_names, egn, id_number, id_year, id_issuer, company_name, company_adress, email } = req.body;
+    const { three_names, egn, id_number, id_year, id_issuer, company_name, company_adress } = req.body;
 
-    if (!three_names || !egn || !id_number || !id_year || !id_issuer || !company_name || !company_adress || !email) {
-      throw new CustomError(400, 'Missing fields: three_names | egn | id_number | id_year | id_issuer | company_name | company_adress | email');
+    if (!three_names || !egn || !id_number || !id_year || !id_issuer || !company_name || !company_adress) {
+      throw new CustomError(400, 'Missing fields: three_names | egn | id_number | id_year | id_issuer | company_name | company_adress');
     }
   
     const documentData = {
@@ -45,45 +45,35 @@ export default class DocumentController {
       company_adress,
     };
 
-    // Create document in database
-    const document = await this.documentDataLayer.create(
+    // Save document to database
+    await this.documentDataLayer.create(
       {
         type: DocumentType.Speciment,
         data: documentData,
-        orderData: {
-          email,
-          cost: 10, // 10 BGN for specimen document
-        },
       },
       this.logContext
     );
 
-    // Generate payment link
-    let paymentUrl: string;
-    try {
-      const paymentLink = await this.myposService.createPaymentLink({
-        amount: 10,
-        currency: 'BGN',
-        order_id: document.id,
-        customer_email: email,
-        customer_name: three_names,
-        note: `Specimen Document for ${three_names}`,
-      });
+    await Promise.allSettled([
+      DocumentController.warmTemplate,
+      DocumentController.warmFooter,
+    ]);
 
-      paymentUrl = paymentLink.payment_url;
-      logger.info(`Payment link generated: ${paymentUrl}`, this.logContext);
+    const templateBuffer = await TemplateCacheUtil.getTemplate(DocumentController.templateName);
+
+    const filledDocx = DocumentController.renderTemplate(templateBuffer, documentData);
+  
+    let pdfStream: Readable;
+    try {
+      pdfStream = await LibreOfficeConverter.docxBufferToPdfStream(filledDocx);
     } catch (err) {
-      logger.error((err as Error)?.message || 'Failed to create payment link', this.logContext);
-      throw new CustomError(500, 'Failed to create payment link');
+      throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${this.logContext} -> convertToPdf`);
     }
 
-    // Return payment URL to frontend instead of PDF
-    res.json({
-      success: true,
-      orderId: document.id,
-      paymentUrl,
-      message: 'Please complete payment to download your document',
-    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="document.pdf"`);
+
+    await pipeline(pdfStream, res);
   }
 
   public downloadDocument: RequestHandler = async (req, res) => {

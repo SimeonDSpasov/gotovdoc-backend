@@ -14,6 +14,9 @@ paymentRouter.post('/webhook/mypos', useCatch(paymentController.handleWebhook));
 // Get payment status for an order
 paymentRouter.get('/status/:orderId', useCatch(paymentController.getPaymentStatus));
 
+// Create payment link
+paymentRouter.post('/link', useCatch(paymentController.createPaymentLink));
+
 export default paymentRouter;
 
 

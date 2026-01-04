@@ -74,6 +74,67 @@ export default class PaymentController {
     });
   }
 
+  public createPaymentLink: RequestHandler = async (req, res) => {
+    try {
+      const { amount, currency, order_id, customer_email, customer_name, note, success_url, cancel_url } = req.body;
+
+      // Validate required fields
+      if (!amount || !currency || !order_id || !customer_email) {
+        throw new CustomError(400, 'Missing required fields: amount, currency, order_id, customer_email');
+      }
+
+      // Validate order_id is a valid MongoDB ObjectId
+      if (!mongoose.isValidObjectId(order_id)) {
+        throw new CustomError(400, 'Invalid order_id format');
+      }
+
+      // Verify order exists
+      const document = await Document.findById(order_id);
+      if (!document) {
+        throw new CustomError(404, 'Order not found');
+      }
+
+      logger.info(`Creating payment link for order: ${order_id}`, this.logContext);
+
+      // Create payment link via myPOS service
+      const paymentLink = await this.myposService.createPaymentLink({
+        amount,
+        currency,
+        order_id,
+        customer_email,
+        customer_name,
+        note,
+        success_url,
+        cancel_url,
+      });
+
+      // Update document with payment link ID
+      await Document.findByIdAndUpdate(
+        order_id,
+        {
+          $set: {
+            'orderData.paymentLinkId': paymentLink.payment_link_id,
+            'orderData.amount': amount,
+            'orderData.currency': currency,
+          },
+        }
+      );
+
+      logger.info(`Payment link created for order: ${order_id}`, this.logContext);
+
+      res.json({
+        success: true,
+        payment_link_id: paymentLink.payment_link_id,
+        payment_url: paymentLink.payment_url,
+        status: paymentLink.status,
+        order_id,
+      });
+    } catch (error: any) {
+      logger.error(error.message, `${this.logContext} -> createPaymentLink`);
+      throw error;
+    }
+  }
+
   private async updateDocumentPaymentStatus(orderId: string, paymentData: any): Promise<void> {
     if (!mongoose.isValidObjectId(orderId)) {
       throw new Error('Invalid order ID');

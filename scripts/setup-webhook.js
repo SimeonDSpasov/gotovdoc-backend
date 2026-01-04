@@ -9,7 +9,7 @@ const CLIENT_SECRET = 'd0eGKwbSkzPrqmzj4gY8tcsbgdaLkt5LODD6vto7bNCREKzW';
 const WEBHOOK_URL = 'https://gotovdoc-backend-production.up.railway.app/api/payment/webhook/mypos';
 
 // Generate a random webhook secret
-const WEBHOOK_SECRET = crypto.randomBytes(32).toString('hex');
+const WEBHOOK_SECRET = 'zaribapastarvazaribapastarva56985698';
 
 console.log('🔧 Setting up myPOS Webhook...\n');
 console.log('📝 Webhook Secret (SAVE THIS!):', WEBHOOK_SECRET);
@@ -38,8 +38,44 @@ async function setupWebhook() {
     console.log('✅ OAuth token obtained\n');
     console.log('Access Token:', accessToken);
 
-    // Step 2: Create Webhook
-    console.log('Step 2: Creating webhook...');
+    // Step 2: List existing webhooks
+    console.log('Step 2: Checking existing webhooks...');
+
+    const listWebhooksResponse = await axios({
+      method: 'GET',
+      url: 'https://webhook-api.mypos.com/v1/webhooks',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    console.log('📋 Existing Webhooks:');
+    console.log(JSON.stringify(listWebhooksResponse.data, null, 2));
+    console.log('');
+
+    // Check if webhook already exists
+    const existingWebhooks = listWebhooksResponse.data.webhooks || listWebhooksResponse.data;
+    const webhookExists = Array.isArray(existingWebhooks) && existingWebhooks.some(
+      webhook => webhook.payload_url === WEBHOOK_URL
+    );
+
+    if (webhookExists) {
+      console.log('⚠️  Webhook already exists for this URL!');
+      console.log('🔗 URL:', WEBHOOK_URL);
+      console.log('\n✅ No need to create a new webhook.\n');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📝 ADD THESE TO YOUR RAILWAY ENVIRONMENT VARIABLES:');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log(`MYPOS_CLIENT_ID=${CLIENT_ID}`);
+      console.log(`MYPOS_CLIENT_SECRET=${CLIENT_SECRET}`);
+      console.log(`MYPOS_WEBHOOK_SECRET=${WEBHOOK_SECRET}`);
+      console.log('Project_ENV=prod');
+      console.log('═══════════════════════════════════════════════════════\n');
+      return;
+    }
+
+    // Step 3: Create Webhook
+    console.log('Step 3: Creating new webhook...');
 
     const webhookResponse = await axios({
       method: 'POST',
@@ -48,10 +84,7 @@ async function setupWebhook() {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      data: new URLSearchParams({
-        payload_url: WEBHOOK_URL,
-        secret: WEBHOOK_SECRET
-      }).toString()
+      data: `payload_url=${encodeURIComponent(WEBHOOK_URL)}&secret=${encodeURIComponent(WEBHOOK_SECRET)}`
     });
 
     console.log('✅ Webhook created successfully!\n');

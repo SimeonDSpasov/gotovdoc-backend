@@ -94,23 +94,45 @@ export default class MyPosService {
     const token = await this.authenticate();
 
     try {
-      const response = await this.axiosInstance.post<CreatePaymentLinkResponse>(
-        '/v1/transactions/payment-links',
-        {
-          amount: params.amount,
-          currency: params.currency,
-          order_id: params.order_id,
-          customer: {
-            email: params.customer_email,
-            name: params.customer_name || '',
-          },
-          note: params.note || '',
-          success_url: params.success_url || this.config.mypos.successUrl,
-          cancel_url: params.cancel_url || this.config.mypos.cancelUrl,
-        },
+      // Generate unique request ID (UUID format)
+      const requestId = this.generateRequestId();
+      // API Key is the same as Client ID
+      const apiKey = this.config.mypos.clientId;
+
+      if (!apiKey) {
+        throw new Error('MYPOS_CLIENT_ID is required');
+      }
+
+      const requestBody = {
+        item_name: params.note || 'Specimen Document',
+        item_price: params.amount,
+        pref_language: 'BG',
+        currency: params.currency,
+        account_number: '',
+        custom_name: 'Payment Link',
+        quantity: 1,
+        website: this.config.frontendUrl,
+        send_sms: false,
+        send_email: true,
+        ask_for_customer_name: true,
+        hide_quantity: true,
+      };
+
+      logger.info(`Creating payment link with request ID: ${requestId}`, 'MyPosService');
+      logger.info(`Request body: ${JSON.stringify(requestBody)}`, 'MyPosService');
+
+      // Use Transactions API v1.1
+      const endpoint = 'https://transactions-api.mypos.com/v1.1/online-payments/link';
+      
+      const response = await axios.post<CreatePaymentLinkResponse>(
+        endpoint,
+        requestBody,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            'API-Key': apiKey,
+            'X-Request-ID': requestId,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         }
       );
@@ -118,12 +140,27 @@ export default class MyPosService {
       logger.info(`Payment link created: ${response.data.payment_url}`, 'MyPosService');
       return response.data;
     } catch (error: any) {
+      const errorMessage = error.response?.data 
+        ? JSON.stringify(error.response.data)
+        : error.message;
+      
       logger.error(
-        error.response?.data?.message || error.message,
+        `Failed to create payment link: ${errorMessage}`,
         'MyPosService -> createPaymentLink'
       );
-      throw new Error('Failed to create payment link');
+      
+      if (error.response?.status) {
+        logger.error(`HTTP Status: ${error.response.status}`, 'MyPosService');
+      }
+      
+      throw new Error(`Failed to create payment link: ${errorMessage}`);
     }
+  }
+
+  private generateRequestId(): string {
+    // Generate UUID-like request ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    const s4 = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+    return `${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
   }
 
   public async getPaymentDetails(paymentLinkId: string): Promise<any> {
