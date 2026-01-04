@@ -1,66 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="bg">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{subject}}</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      background:#fff;
-      color:#000;
-    }
-    .container {
-      max-width:600px;
-      margin:0 auto;
-      border:4px solid #000; /* squared black border */
-      padding:32px;
-    }
-    .logo {
-      text-align:center;
-      margin-bottom:24px;
-    }
-    .content {
-      margin-bottom:32px;
-    }
-    .social {
-      text-align:center;
-      margin-top:32px;
-    }
-    .social a {
-      display:inline-block;
-      margin:0 8px;
-    }
-    .social img {
-      width:32px;
-      height:32px;
-      padding:6px;
-    }
-    .footer {
-      text-align:center;
-      font-size:12px;
-      border-top:2px solid #000;
-      padding-top:12px;
-    }
-  </style>
 </head>
-<body>
-  <div class="container">
-    <div class="logo">
-      <img src="cid:logo" alt="DripNat" style="max-width:150px;" />
-    </div>
-
-    <div class="content">
-      {{> partial}}
-    </div>
-
-
-    <div class="footer">
-      &copy; {{currentYear}} Gotovdoc. All rights reserved.<br/>
-      You are receiving this email because of activity on dripnat.com.
-    </div>
-  </div>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; background-color: #0a1628;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #0a1628;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #15253d; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #1db4a1 0%, #16a085 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: 600; letter-spacing: 1px;">ГОТОВДОК</h1>
+              <p style="color: rgba(255, 255, 255, 0.9); margin: 8px 0 0 0; font-size: 14px; font-weight: 400;">Професионални документи за секунди</p>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 50px 40px; color: #e8edf3;">
+              {{> partial}}
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #0f1d2f; padding: 30px 40px; text-align: center; border-top: 1px solid rgba(29, 180, 161, 0.2);">
+              <p style="color: #8b9db5; font-size: 14px; margin: 0 0 12px 0; line-height: 1.6;">
+                © {{currentYear}} GotovDoc. Всички права запазени.
+              </p>
+              <p style="color: #6b7c93; font-size: 12px; margin: 0; line-height: 1.5;">
+                Този имейл е изпратен от автоматизирана система. Моля, не отговаряйте директно на този имейл.
+              </p>
+              <div style="margin-top: 20px;">
+                <a href="https://gotovdoc.bg" style="color: #1db4a1; text-decoration: none; font-size: 13px; margin: 0 10px;">Начало</a>
+                <span style="color: #3d4f64;">|</span>
+                <a href="https://gotovdoc.bg/contact" style="color: #1db4a1; text-decoration: none; font-size: 13px; margin: 0 10px;">Свържи се</a>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
-</html> 
+</html>

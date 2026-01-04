@@ -1,8 +1,11 @@
 import { RequestHandler, Request } from 'express';
 
-import UserDataLayer from './../data-layers/user.data-layer';
+import TokenUtil from '../utils/token.util';
+import CustomError from '../utils/custom-error.utils';
 
-import { UserDoc } from './../models/user.model';
+import UserDataLayer from '../data-layers/user.data-layer';
+
+import { UserDoc, UserRole } from '../models/user.model';
 
 declare global {
   namespace Express {
@@ -14,62 +17,90 @@ declare global {
 
 export default class AuthMiddleware {
 
-  // private logContext = 'Auth Middleware';
+  private logContext = 'Auth Middleware';
 
-  // private tokenUtil = TokenUtil.getInstance();
-  // private userDataLayer = UserDataLayer.getInstance();
+  private tokenUtil = TokenUtil.getInstance();
+  private userDataLayer = UserDataLayer.getInstance();
 
-  // public isAuthenticated: RequestHandler = async (req, res, next) => {
-  //   const accessToken = this.getAccessTokenFromHeaders(req);
+  public isAuthenticated: RequestHandler = async (req, res, next) => {
+    const accessToken = this.getAccessTokenFromHeaders(req);
 
-  //   if (!accessToken) {
-  //     return next(new CustomError(401, 'Unauthorized'));
-  //   }
+    console.log(accessToken);
+    console.log(req.headers['authorization-access']);
+    console.log(req.query['authorization-access']);
 
-  //   const logContext = `${this.logContext} -> isAuthenticated()`;
+    if (!accessToken) {
+      return next(new CustomError(401, 'Unauthorized'));
+    }
 
-  //   try {
-  //     const userId = this.tokenUtil.getUserIdFromAccessToken(accessToken);
-  //     const user = await this.userDataLayer.getById(userId, logContext, '');
+    const logContext = `${this.logContext} -> isAuthenticated()`;
 
-  //     if (user.suspended) {
-  //       return next(new CustomError(403, 'Forbidden'));
-  //     }
+    try {
+      const userId = this.tokenUtil.getUserIdFromAccessToken(accessToken);
+      const user = await this.userDataLayer.getById(userId, logContext, '');
 
-  //     req.user = user;
+      if (user.suspended) {
+        return next(new CustomError(403, 'Forbidden'));
+      }
 
-  //     next();
-  //   } catch (err) {
-  //     next(new CustomError(498, 'Expired token'));
-  //   }
-  // }
+      req.user = user;
 
-  // private getAccessTokenFromHeaders(req: Request): string | undefined {
-  //   let headerValue;
-  //   let accessToken;
+      next();
+    } catch (err) {
+      next(new CustomError(498, 'Expired token'));
+    }
+  }
 
-  //   if (req.headers['authorization-access']) {
-  //     headerValue = req.headers['authorization-access']
-  //   } else if (req.query['authorization-access']) {
-  //     headerValue = req.query['authorization-access']
-  //   }
+  public isAdmin: RequestHandler = (req, res, next) => {
+    const user = req.user;
 
-  //   if (headerValue && typeof headerValue === 'string') {
-  //     accessToken = headerValue.split(' ')[1];
-  //   }
+    if (user.role !== UserRole.Admin) {
+      next(new CustomError(403, 'Forbidden - Admin access required'));
 
-  //   return accessToken;
-  // }
+      return;
+    }
 
-  // private static instance: AuthMiddleware;
+    next();
+  }
 
-  // public static getInstance(): AuthMiddleware {
-  //   if (!AuthMiddleware.instance) {
-  //     AuthMiddleware.instance = new AuthMiddleware();
-  //   }
+  public isModerator: RequestHandler = (req, res, next) => {
+    const user = req.user;
 
-  //   return AuthMiddleware.instance;
-  // }
+    if (user.role !== UserRole.Moderator && user.role !== UserRole.Admin) {
+      next(new CustomError(403, 'Forbidden - Moderator access required'));
+
+      return;
+    }
+
+    next();
+  }
+
+  private getAccessTokenFromHeaders(req: Request): string | undefined {
+    let headerValue;
+    let accessToken;
+
+    if (req.headers['authorization-access']) {
+      headerValue = req.headers['authorization-access']
+    } else if (req.query['authorization-access']) {
+      headerValue = req.query['authorization-access']
+    }
+
+    if (headerValue && typeof headerValue === 'string') {
+      accessToken = headerValue.split(' ')[1];
+    }
+
+    return accessToken;
+  }
+
+  private static instance: AuthMiddleware;
+
+  public static getInstance(): AuthMiddleware {
+    if (!AuthMiddleware.instance) {
+      AuthMiddleware.instance = new AuthMiddleware();
+    }
+
+    return AuthMiddleware.instance;
+  }
 
 }
 

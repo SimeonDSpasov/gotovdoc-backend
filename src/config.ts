@@ -58,6 +58,14 @@ export default class Config {
     }[this.env];
   }
 
+  // Auth / JWT
+  public jwt = {
+    accessExpireTime: 3600, // 1 hour
+    refreshExpireTime: 43200, // 12 hours
+    accessSecret: process.env.JWT_ACCESS_SECRET || 'your-access-secret-key-change-in-production',
+    refreshSecret: process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key-change-in-production',
+  };
+
   // MyPOS Configuration
   public mypos = {
     clientId: process.env.MYPOS_CLIENT_ID || '',

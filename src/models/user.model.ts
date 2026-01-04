@@ -23,14 +23,12 @@ export enum UserRank {
   Ninja,
 }
 
-interface Stats {
-  currentEloRank: number;
-}
-
 interface IUser {
   role: UserRole;
   email: string;
   password: string;
+  firstName: string;
+  lastName: string;
   suspended: boolean,
   createdAt: Date;
 }
@@ -46,6 +44,14 @@ const UserSchema = new mongoose.Schema<IUser>({
     unique: true
   },
   password: {
+    type: String,
+    required: true
+  },
+  firstName: {
+    type: String,
+    required: true
+  },
+  lastName: {
     type: String,
     required: true
   },

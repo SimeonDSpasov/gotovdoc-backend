@@ -1,13 +1,35 @@
-<p class="name">Здравейте, <b>Екип</b>,</p>
+<div style="margin-bottom: 30px;">
+  <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #1db4a1 0%, #16a085 100%); border-radius: 50%; margin: 0 0 20px 0; line-height: 60px; text-align: center; display: inline-block;">
+    <span style="font-size: 30px; line-height: 60px; vertical-align: middle;">📧</span>
+  </div>
+  <h2 style="color: #ffffff; margin: 10px 0 10px 0; font-size: 24px; font-weight: 600;">Ново съобщение от контакт формата</h2>
+  <p style="color: #8b9db5; font-size: 14px; margin: 0;">Получено от gotovdoc.bg</p>
+</div>
 
-<p>Потребител желае да се свърже с вас:</p>
+<div style="margin: 30px 0;">
+  <div style="margin-bottom: 20px; padding: 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px; border-left: 4px solid #1db4a1;">
+    <p style="color: #8b9db5; font-size: 13px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ИМЕ</p>
+    <p style="color: #ffffff; font-size: 16px; margin: 0; font-weight: 500;">{{name}}</p>
+  </div>
 
-<div class="margin">
-    <p>Име: <b>{{ name }}</b></p>
+  <div style="margin-bottom: 20px; padding: 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px; border-left: 4px solid #1db4a1;">
+    <p style="color: #8b9db5; font-size: 13px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ИМЕЙЛ</p>
+    <p style="color: #ffffff; font-size: 16px; margin: 0; font-weight: 500;">{{email}}</p>
+  </div>
 
-    <p>Имейл: <b>{{ email }}</b></p>
+  <div style="margin-bottom: 20px; padding: 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px; border-left: 4px solid #1db4a1;">
+    <p style="color: #8b9db5; font-size: 13px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ТЕЛЕФОН</p>
+    <p style="color: #ffffff; font-size: 16px; margin: 0; font-weight: 500;">{{phoneNumber}}</p>
+  </div>
 
-    <p>Телефон: <b>{{ phoneNumber }}</b></p>
+  <div style="margin-bottom: 20px; padding: 25px; background-color: rgba(29, 180, 161, 0.1); border-radius: 8px; border-left: 4px solid #1db4a1;">
+    <p style="color: #8b9db5; font-size: 13px; margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 0.5px;">СЪОБЩЕНИЕ</p>
+    <p style="color: #e8edf3; font-size: 15px; margin: 0; line-height: 1.7;">{{message}}</p>
+  </div>
+</div>
 
-    <p>Съобщение: {{ message }}</p>
+<div style="margin: 30px 0; padding: 20px; background-color: rgba(255, 255, 255, 0.03); border-radius: 6px; text-align: center;">
+  <p style="color: #8b9db5; font-size: 13px; margin: 0;">
+    💡 Отговорете директно на <strong style="color: #1db4a1;">{{email}}</strong>
+  </p>
 </div>

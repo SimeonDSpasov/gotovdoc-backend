@@ -26,26 +26,26 @@ export default class LoggerSetup {
   }
 
   private setEmailFunction(): void {
-    // logger.emailFunction = (where: string, message: string) => {
+    logger.emailFunction = (where: string, message: string) => {
 
-    //   if (this.config.env === 'dev') {
-    //     return;
-    //   }
+      if (this.config.env === 'dev') {
+        return;
+      }
 
-    //   const emailData = {
-    //     toEmail: this.config.devEmail,
-    //     subject: `Kind Skiptracing ${this.config.env.toUpperCase()} Error`,
-    //     template: 'error',
-    //     payload: {
-    //       where,
-    //       message,
-    //     },
-    //   };
+      const emailData = {
+        toEmail: this.config.infoAccountEmail,
+        subject: `Kind Skiptracing ${this.config.env.toUpperCase()} Error`,
+        template: 'error',
+        payload: {
+          where,
+          message,
+        },
+      };
 
-    //   this.emailUtil.sendEmail(emailData, EmailType.Info, '')
-    //     .catch(err => console.dir(err, { depth: 10 }));
+      this.emailUtil.sendEmail(emailData, EmailType.Info, '')
+        .catch(err => console.dir(err, { depth: 10 }));
 
-    // }
+    }
   }
 
   private async unhandledErrors(message: string): Promise<void> {
