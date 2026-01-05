@@ -25,6 +25,48 @@ interface CreatePaymentLinkResponse {
   status: string;
 }
 
+interface CreatePaymentButtonRequest {
+  item_name: string;
+  item_price: number;
+  pref_language?: string;
+  currency: string;
+  account_number?: string;
+  custom_name?: string;
+  quantity?: number;
+  website?: string;
+  send_sms?: boolean;
+  send_email?: boolean;
+  button_size?: number;
+  ask_for_customer_name?: boolean;
+  ask_for_shipping_address?: boolean;
+  ask_for_customer_email?: boolean;
+  ask_for_customer_phone?: boolean;
+  cancel_url?: string;
+  return_url?: string;
+}
+
+interface CreatePaymentButtonResponse {
+  button_id?: string;
+  button_code?: string;
+  [key: string]: any;
+}
+
+interface SettlementData {
+  account_number?: string;
+  iban?: string;
+  bank_name?: string;
+  swift?: string;
+  account_holder?: string;
+  // Add other fields based on myPOS API response
+  [key: string]: any;
+}
+
+interface AccountsData {
+  accounts?: any[];
+  // Add other fields based on myPOS API response
+  [key: string]: any;
+}
+
 export default class MyPosService {
   private static instance: MyPosService;
   private axiosInstance: AxiosInstance;
@@ -87,6 +129,58 @@ export default class MyPosService {
     } catch (error: any) {
       logger.error(error.message, 'MyPosService -> authenticate');
       throw new Error('Failed to authenticate with myPOS');
+    }
+  }
+
+  public async createPaymentButton(params: CreatePaymentButtonRequest): Promise<CreatePaymentButtonResponse> {
+    const token = await this.authenticate();
+
+    try {
+      // Generate unique request ID (UUID format)
+      const requestId = this.generateRequestId();
+      // API Key is the same as Client ID
+      const apiKey = this.config.mypos.clientId;
+
+      if (!apiKey) {
+        throw new Error('MYPOS_CLIENT_ID is required');
+      }
+
+      logger.info(`Creating payment button with request ID: ${requestId}`, 'MyPosService');
+      logger.info(`Request body: ${JSON.stringify(params)}`, 'MyPosService');
+
+      // Use Transactions API v1.1
+      const endpoint = 'https://transactions-api.mypos.com/v1.1/online-payments/button';
+      
+      const response = await axios.post<CreatePaymentButtonResponse>(
+        endpoint,
+        params,
+        {
+          headers: {
+            'API-Key': apiKey,
+            'X-Request-ID': requestId,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      logger.info('Payment button created successfully', 'MyPosService');
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data 
+        ? JSON.stringify(error.response.data)
+        : error.message;
+      
+      logger.error(
+        `Failed to create payment button: ${errorMessage}`,
+        'MyPosService -> createPaymentButton'
+      );
+      
+      if (error.response?.status) {
+        logger.error(`HTTP Status: ${error.response.status}`, 'MyPosService');
+      }
+      
+      throw new Error(`Failed to create payment button: ${errorMessage}`);
     }
   }
 
@@ -161,6 +255,106 @@ export default class MyPosService {
     // Generate UUID-like request ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     const s4 = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
     return `${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
+  }
+
+  public async getAccounts(): Promise<AccountsData> {
+    const token = await this.authenticate();
+
+    try {
+      // Generate unique request ID (UUID format)
+      const requestId = this.generateRequestId();
+      // API Key is the same as Client ID
+      const apiKey = this.config.mypos.clientId;
+
+      if (!apiKey) {
+        throw new Error('MYPOS_CLIENT_ID is required');
+      }
+
+      logger.info(`Fetching accounts with request ID: ${requestId}`, 'MyPosService');
+
+      // Use Transactions API v1.1
+      const endpoint = 'https://transactions-api.mypos.com/v1.1/accounts';
+      
+      const response = await axios.get<AccountsData>(
+        endpoint,
+        {
+          headers: {
+            'API-Key': apiKey,
+            'X-Request-ID': requestId,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      logger.info('Accounts retrieved successfully', 'MyPosService');
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data 
+        ? JSON.stringify(error.response.data)
+        : error.message;
+      
+      logger.error(
+        `Failed to get accounts: ${errorMessage}`,
+        'MyPosService -> getAccounts'
+      );
+      
+      if (error.response?.status) {
+        logger.error(`HTTP Status: ${error.response.status}`, 'MyPosService');
+      }
+      
+      throw new Error(`Failed to get accounts: ${errorMessage}`);
+    }
+  }
+
+  public async getSettlementData(): Promise<SettlementData> {
+    const token = await this.authenticate();
+
+    try {
+      // Generate unique request ID (UUID format)
+      const requestId = this.generateRequestId();
+      // API Key is the same as Client ID
+      const apiKey = this.config.mypos.clientId;
+
+      if (!apiKey) {
+        throw new Error('MYPOS_CLIENT_ID is required');
+      }
+
+      logger.info(`Fetching settlement data with request ID: ${requestId}`, 'MyPosService');
+
+      // Use Transactions API v1.1
+      const endpoint = 'https://transactions-api.mypos.com/v1.1/online-payments/settlement-data';
+      
+      const response = await axios.get<SettlementData>(
+        endpoint,
+        {
+          headers: {
+            'API-Key': apiKey,
+            'X-Request-ID': requestId,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      logger.info('Settlement data retrieved successfully', 'MyPosService');
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data 
+        ? JSON.stringify(error.response.data)
+        : error.message;
+      
+      logger.error(
+        `Failed to get settlement data: ${errorMessage}`,
+        'MyPosService -> getSettlementData'
+      );
+      
+      if (error.response?.status) {
+        logger.error(`HTTP Status: ${error.response.status}`, 'MyPosService');
+      }
+      
+      throw new Error(`Failed to get settlement data: ${errorMessage}`);
+    }
   }
 
   public async getPaymentDetails(paymentLinkId: string): Promise<any> {

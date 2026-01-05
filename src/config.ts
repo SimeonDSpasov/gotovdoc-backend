@@ -68,8 +68,18 @@ export default class Config {
 
   // MyPOS Configuration
   public mypos = {
+    // REST API v1.1 credentials
     clientId: process.env.MYPOS_CLIENT_ID || '',
     clientSecret: process.env.MYPOS_CLIENT_SECRET || '',
+    
+    // Checkout API v1.4 credentials
+    sid: process.env.MYPOS_SID || '',
+    walletNumber: process.env.MYPOS_WALLET_NUMBER || '',
+    keyIndex: parseInt(process.env.MYPOS_KEY_INDEX || '1'),
+    privateKey: process.env.MYPOS_PRIVATE_KEY || '',
+    publicCert: process.env.MYPOS_PUBLIC_CERT || '',
+    
+    // Common settings
     isProduction: this.env === 'prod',
     successUrl: process.env.MYPOS_SUCCESS_URL || `${this.frontendUrl}/payment/success`,
     cancelUrl: process.env.MYPOS_CANCEL_URL || `${this.frontendUrl}/payment/cancel`,

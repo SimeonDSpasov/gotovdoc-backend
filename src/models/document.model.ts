@@ -42,6 +42,8 @@ export interface DocumentOrder {
   failedAt?: Date;
   amount?: number;
   currency?: string;
+  refunded?: boolean;
+  refundedAt?: Date;
 }
 
 interface IDocument {

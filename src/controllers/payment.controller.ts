@@ -74,6 +74,25 @@ export default class PaymentController {
     });
   }
 
+  public createPaymentButton: RequestHandler = async (req, res) => {
+    try {
+      logger.info('Creating payment button', this.logContext);
+
+      // Create payment button via myPOS service
+      const paymentButton = await this.myposService.createPaymentButton(req.body);
+
+      logger.info('Payment button created successfully', this.logContext);
+
+      res.json({
+        success: true,
+        data: paymentButton,
+      });
+    } catch (error: any) {
+      logger.error(error.message, `${this.logContext} -> createPaymentButton`);
+      throw error;
+    }
+  }
+
   public createPaymentLink: RequestHandler = async (req, res) => {
     try {
       const { amount, currency, order_id, customer_email, customer_name, note, success_url, cancel_url } = req.body;
@@ -131,6 +150,44 @@ export default class PaymentController {
       });
     } catch (error: any) {
       logger.error(error.message, `${this.logContext} -> createPaymentLink`);
+      throw error;
+    }
+  }
+
+  public getAccounts: RequestHandler = async (req, res) => {
+    try {
+      logger.info('Fetching accounts from myPOS', this.logContext);
+
+      // Get accounts from myPOS
+      const accountsData = await this.myposService.getAccounts();
+
+      logger.info('Accounts retrieved successfully', this.logContext);
+
+      res.json({
+        success: true,
+        data: accountsData,
+      });
+    } catch (error: any) {
+      logger.error(error.message, `${this.logContext} -> getAccounts`);
+      throw error;
+    }
+  }
+
+  public getSettlementData: RequestHandler = async (req, res) => {
+    try {
+      logger.info('Fetching settlement data from myPOS', this.logContext);
+
+      // Get settlement data from myPOS
+      const settlementData = await this.myposService.getSettlementData();
+
+      logger.info('Settlement data retrieved successfully', this.logContext);
+
+      res.json({
+        success: true,
+        data: settlementData,
+      });
+    } catch (error: any) {
+      logger.error(error.message, `${this.logContext} -> getSettlementData`);
       throw error;
     }
   }
