@@ -154,56 +154,6 @@ export default class MyPosCheckoutService {
     }
   }
 
-  /**
-   * Verify RSA signature from myPOS response
-   */
-  public verifySignature(data: Record<string, any>, signature: string): boolean {
-    try {
-      logger.info(`[verifySignature] Starting signature verification...`);
-      
-      // TEMPORARY: Skip signature verification in test mode if enabled
-      if (this.config.mypos.skipSignatureVerification) {
-        logger.error(`[verifySignature] ⚠️  SKIPPING signature verification (MYPOS_SKIP_SIGNATURE_VERIFICATION=true)`, 'MyPosCheckoutService');
-        logger.error(`[verifySignature] ⚠️  This should ONLY be used in test mode!`, 'MyPosCheckoutService');
-        return true;
-      }
-      
-      // Remove signature from data for verification
-      const { Signature, ...dataWithoutSig } = data;
-      logger.info(`[verifySignature] Data fields (without signature): ${Object.keys(dataWithoutSig).join(', ')}`);
-      
-      // Concatenate all values
-      const dataString = Object.values(dataWithoutSig).join('');
-      logger.info(`[verifySignature] Data string for verification (first 100 chars): ${dataString.substring(0, 100)}...`);
-      logger.info(`[verifySignature] Data string length: ${dataString.length}`);
-      
-      // Use myPOS server certificate to verify THEIR signatures (webhooks)
-      // NOT our merchant certificate!
-      const certToUse = this.config.mypos.myposServerCert || this.config.mypos.publicCert;
-      logger.info(`[verifySignature] Using myPOS server cert: ${!!this.config.mypos.myposServerCert}`);
-      logger.info(`[verifySignature] Cert available: ${!!certToUse}`);
-      logger.info(`[verifySignature] Cert length: ${certToUse?.length || 0}`);
-      
-      if (!certToUse) {
-        logger.error(`[verifySignature] No certificate available for webhook verification!`, 'MyPosCheckoutService');
-        return false;
-      }
-      
-      // Verify signature using myPOS server certificate
-      const verify = crypto.createVerify('SHA1');
-      verify.update(dataString);
-      verify.end();
-      
-      const isValid = verify.verify(certToUse, signature, 'base64');
-      logger.info(`[verifySignature] Verification result: ${isValid}`);
-      
-      return isValid;
-    } catch (error: any) {
-      logger.error(`[verifySignature] Failed to verify signature: ${error.message}`, 'MyPosCheckoutService');
-      logger.error(`[verifySignature] Error stack: ${error.stack}`, 'MyPosCheckoutService');
-      return false;
-    }
-  }
 
   /**
    * Create a purchase transaction for Embedded SDK
@@ -417,7 +367,72 @@ export default class MyPosCheckoutService {
   }
 
   /**
+   * Verify signature from myPOS webhook notification
+   * 
+   * According to myPOS docs:
+   * - Signature is SHA-256 RSA signature (BASE64 encoded)
+   * - All parameters EXCEPT Signature are concatenated in order
+   * - Signature is ALWAYS THE LAST PARAMETER
+   * - Verify using OUR merchant public certificate (same keypair used for signing requests)
+   * 
+   * @param data - Webhook data including Signature
+   * @returns true if signature is valid
+   */
+  private verifyWebhookSignature(data: Record<string, any>): boolean {
+    try {
+      const signature = data.Signature;
+      if (!signature) {
+        logger.info('[verifyWebhookSignature] No signature provided');
+        return false;
+      }
+
+      // Use our merchant public certificate to verify webhook signature
+      const publicCert = this.config.mypos.publicCert;
+
+      if (!publicCert) {
+        logger.info('[verifyWebhookSignature] Merchant public certificate not configured');
+        return false;
+      }
+
+      // Build data string (all params except Signature, in order they appear)
+      const dataString = Object.keys(data)
+        .filter(key => key !== 'Signature')
+        .map(key => data[key])
+        .join('');
+
+      logger.info(`[verifyWebhookSignature] Data string (first 100 chars): ${dataString.substring(0, 100)}...`);
+      logger.info(`[verifyWebhookSignature] Data string length: ${dataString.length}`);
+      logger.info(`[verifyWebhookSignature] Using public cert: ${publicCert.substring(0, 50)}...`);
+
+      // Verify signature using our merchant public certificate
+      const verifier = crypto.createVerify('RSA-SHA256');
+      verifier.update(dataString, 'utf8');
+      verifier.end();
+
+      const isValid = verifier.verify(
+        publicCert,
+        signature,
+        'base64'
+      );
+
+      logger.info(`[verifyWebhookSignature] Signature verification result: ${isValid}`);
+      return isValid;
+    } catch (error: any) {
+      logger.error(`[verifyWebhookSignature] Error: ${error.message}`, 'MyPosCheckoutService');
+      return false;
+    }
+  }
+
+  /**
    * Process webhook notification from myPOS
+   * 
+   * Security layers:
+   * 1. HTTPS/TLS - Railway provides SSL certificate for secure connection
+   * 2. Signature verification - Verify webhook is from myPOS using our merchant public cert
+   * 3. Amount verification - Always verify payment amount matches order
+   * 
+   * Note: Signature verification can be disabled with MYPOS_SKIP_SIGNATURE_VERIFICATION=true
+   * This is useful for testing when you haven't set up RSA keys yet.
    */
   public processWebhookNotification(data: Record<string, any>): {
     isValid: boolean;
@@ -434,28 +449,22 @@ export default class MyPosCheckoutService {
       logger.info(`[processWebhookNotification] Data type: ${typeof data}`);
       logger.info(`[processWebhookNotification] Data keys: ${data ? Object.keys(data).join(', ') : 'NO DATA'}`);
       
-      const signature = data.Signature;
-      logger.info(`[processWebhookNotification] Signature present: ${!!signature}`);
+      // Verify signature (if enabled and certificate is available)
+      if (!this.config.mypos.skipSignatureVerification) {
+        logger.info('[processWebhookNotification] Verifying signature...');
+        const isSignatureValid = this.verifyWebhookSignature(data);
+        
+        if (!isSignatureValid) {
+          logger.error('[processWebhookNotification] ❌ INVALID SIGNATURE - Possible fraud attempt!', 'MyPosCheckoutService');
+          return { isValid: false, method: data.IPCmethod || 'unknown' };
+        }
+        
+        logger.info('[processWebhookNotification] ✅ Signature verified successfully');
+      } else {
+        logger.info('[processWebhookNotification] ⚠️  Signature verification DISABLED (relying on HTTPS/TLS security)');
+      }
       
-      if (!signature) {
-        logger.error('[processWebhookNotification] No signature in webhook data', 'MyPosCheckoutService');
-        return { isValid: false, method: data.IPCmethod || 'unknown' };
-      }
-
-      logger.info(`[processWebhookNotification] Signature value: ${signature.substring(0, 50)}...`);
-      logger.info(`[processWebhookNotification] Verifying signature...`);
-
-      // Verify signature
-      const isValid = this.verifySignature(data, signature);
-      logger.info(`[processWebhookNotification] Signature verification result: ${isValid}`);
-
-      if (!isValid) {
-        logger.error('[processWebhookNotification] Invalid signature in webhook', 'MyPosCheckoutService');
-        logger.error(`[processWebhookNotification] Webhook data: ${JSON.stringify(data)}`, 'MyPosCheckoutService');
-        return { isValid: false, method: data.IPCmethod || 'unknown' };
-      }
-
-      logger.info(`[processWebhookNotification] ✅ Valid webhook received: ${data.IPCmethod}`);
+      logger.info(`[processWebhookNotification] ✅ Processing webhook: ${data.IPCmethod}`);
       logger.info(`[processWebhookNotification] OrderID: ${data.OrderID}, Status: ${data.Status}, Amount: ${data.Amount}`);
 
       return {

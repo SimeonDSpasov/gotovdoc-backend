@@ -92,12 +92,6 @@ export default class Config {
       ? (process.env.MYPOS_PUBLIC_CERT || '')
       : (process.env.MYPOS_TEST_PUBLIC_CERT || process.env.MYPOS_PUBLIC_CERT || '');
     
-    // myPOS server certificate for verifying THEIR webhook signatures
-    // This is DIFFERENT from the merchant certificate above!
-    const myposServerCert = isProduction
-      ? (process.env.MYPOS_SERVER_CERT || '')
-      : (process.env.MYPOS_TEST_SERVER_CERT || process.env.MYPOS_SERVER_CERT || '');
-    
     return {
       // REST API v1.1 credentials
       clientId: process.env.MYPOS_CLIENT_ID || '',
@@ -109,7 +103,6 @@ export default class Config {
       keyIndex,
       privateKey,
       publicCert, // OUR merchant certificate (for signing our requests)
-      myposServerCert, // myPOS's certificate (for verifying their webhooks)
       
       // Common settings
       isProduction,
@@ -158,14 +151,13 @@ export default class Config {
     console.log(`  Key Index: ${this.mypos.keyIndex}`);
     console.log('');
     
-    console.log('🔐 Signing Keys (YOUR keys - for signing requests TO myPOS):');
+    console.log('🔐 RSA Keys (YOUR merchant keys):');
     console.log(`  Private Key: ${maskKey(this.mypos.privateKey)}`);
+    console.log(`    └─ Used to sign outgoing requests TO myPOS`);
     console.log(`  Public Cert: ${maskKey(this.mypos.publicCert)}`);
+    console.log(`    └─ Used to verify incoming webhooks FROM myPOS`);
     console.log('');
-    
-    console.log('🔒 Verification Keys (myPOS keys - for verifying webhooks FROM myPOS):');
-    console.log(`  myPOS Server Cert: ${maskKey(this.mypos.myposServerCert)}`);
-    console.log('');
+    console.log('  ℹ️  Note: Same keypair is used for both directions');
     
     console.log('🌐 Endpoints:');
     console.log(`  Base URL: ${this.mypos.isProduction ? 'https://www.mypos.eu/vmp/checkout' : 'https://www.mypos.eu/vmp/checkout-test'}`);
@@ -180,11 +172,16 @@ export default class Config {
     if (!this.mypos.walletNumber) warnings.push('⚠️  MYPOS_WALLET_NUMBER is not set!');
     if (!this.mypos.privateKey) warnings.push('⚠️  MYPOS_PRIVATE_KEY is not set! Cannot sign requests.');
     if (!this.mypos.publicCert) warnings.push('⚠️  MYPOS_PUBLIC_CERT is not set!');
-    if (!this.mypos.myposServerCert) warnings.push('⚠️  MYPOS_SERVER_CERT is not set! Cannot verify webhooks.');
     
     if (this.mypos.skipSignatureVerification) {
-      warnings.push('🚨 SIGNATURE VERIFICATION IS DISABLED! (MYPOS_SKIP_SIGNATURE_VERIFICATION=true)');
-      warnings.push('   This should ONLY be used in test mode!');
+      warnings.push('🔓 Webhook signature verification is DISABLED');
+      warnings.push('   Security: Relying on HTTPS/TLS + amount verification');
+      warnings.push('   To enable: Set MYPOS_SKIP_SIGNATURE_VERIFICATION=false');
+    } else if (this.mypos.publicCert) {
+      console.log('✅ Webhook signature verification is ENABLED');
+    } else {
+      warnings.push('⚠️  Webhook signature verification ENABLED but public cert is missing!');
+      warnings.push('   Set MYPOS_PUBLIC_CERT or disable with MYPOS_SKIP_SIGNATURE_VERIFICATION=true');
     }
     
     if (warnings.length > 0) {

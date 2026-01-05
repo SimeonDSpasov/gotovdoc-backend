@@ -8,31 +8,13 @@ const paymentController = new PaymentController();
 
 const paymentRouter = Router();
 
-// === EMBEDDED CHECKOUT API (IPC v1.4) ===
+// === CHECKOUT API (IPC v1.4) ===
 // Create order and get signed payment parameters
 paymentRouter.post('/create-order', useCatch(paymentController.createOrder));
 
 // Handle myPOS IPC notification (IPCPurchaseNotify)
 paymentRouter.post('/notify', useCatch(paymentController.handleIPCNotification));
 
-// === REST API (Payment Links/Buttons) ===
-// Webhook endpoint for myPOS REST API payment notifications
-paymentRouter.post('/webhook/mypos', useCatch(paymentController.handleWebhook));
-
-// Get payment status for an order
-paymentRouter.get('/status/:orderId', useCatch(paymentController.getPaymentStatus));
-
-// Create payment button
-paymentRouter.post('/button', useCatch(paymentController.createPaymentButton));
-
-// Create payment link
-paymentRouter.post('/link', useCatch(paymentController.createPaymentLink));
-
-// Get accounts from myPOS
-paymentRouter.get('/accounts', useCatch(paymentController.getAccounts));
-
-// Get settlement data from myPOS
-paymentRouter.get('/settlement-data', useCatch(paymentController.getSettlementData));
 
 export default paymentRouter;
 
