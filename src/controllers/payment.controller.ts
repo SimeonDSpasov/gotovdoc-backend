@@ -8,6 +8,7 @@ import MyPosCheckoutService, { CartItem } from '../services/mypos-checkout.servi
 import { Document, DocumentType } from '../models/document.model';
 import DocumentDataLayer from '../data-layers/document.data-layer';
 import OrderDataLayer from '../data-layers/order.data-layer';
+import PriceValidationService from '../services/price-validation.service';
 import mongoose from 'mongoose';
 import Config from '../config';
 
@@ -18,7 +19,29 @@ export default class PaymentController {
   private myposCheckoutService = MyPosCheckoutService.getInstance();
   private documentDataLayer = DocumentDataLayer.getInstance();
   private orderDataLayer = OrderDataLayer.getInstance();
+  private priceValidationService = PriceValidationService;
   private config = Config.getInstance();
+
+  /**
+   * Get available documents and packages with prices
+   * GET /api/payment/prices
+   */
+  public getPrices: RequestHandler = async (req, res) => {
+    try {
+      const documents = this.priceValidationService.getAllDocumentPrices();
+      const packages = this.priceValidationService.getAllPackagePrices();
+
+      res.status(200).json({
+        documents,
+        packages,
+        vatRate: 0.20,
+        currency: 'EUR',
+      });
+    } catch (error: any) {
+      logger.error(`Failed to get prices: ${error.message}`, this.logContext);
+      throw new CustomError(500, 'Failed to retrieve prices');
+    }
+  };
 
   /**
    * Create order and return signed payment parameters
@@ -32,25 +55,34 @@ export default class PaymentController {
         throw new CustomError(400, 'Missing or invalid items');
       }
 
-      // Map items to match Order schema requirements
-      const mappedItems = items.map((item: any) => ({
-        id: item.id || `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: item.type || 'package', // Default to 'package' if not specified
-        name: item.name || 'Item',
-        description: item.description || '',
-        price: item.price || 0,
-        formData: item.formData || {},
-        documentIds: item.documentIds || [],
-      }));
+      // SECURITY: Validate prices against backend configuration
+      const validation = this.priceValidationService.validateOrder(items);
 
-      // Calculate totals from BACKEND (never trust frontend!)
-      let subtotal = 0;
-      for (const item of mappedItems) {
-        subtotal += item.price || 0;
+      if (!validation.isValid) {
+        logger.error(`Price validation failed: ${validation.errors.join(', ')}`, this.logContext);
+        throw new CustomError(400, `Invalid prices: ${validation.errors.join(', ')}`);
       }
 
-      const vat = subtotal * 0.2; // 20% VAT
-      const total = subtotal + vat;
+      // Use BACKEND prices (never trust frontend!)
+      const subtotal = validation.expectedAmount;
+      const vat = validation.expectedVat;
+      const total = validation.expectedTotal;
+
+      // Map items to match Order schema requirements
+      // IMPORTANT: Use backend prices, not frontend prices
+      const mappedItems = items.map((item: any) => {
+        const expectedPrice = this.priceValidationService.getItemPriceInfo(item.id, item.type).price || 0;
+        
+        return {
+          id: item.id || `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: item.type || 'package',
+          name: item.name || 'Item',
+          description: item.description || '',
+          price: expectedPrice, // Use backend price, not frontend price!
+          formData: item.formData || {},
+          documentIds: item.documentIds || [],
+        };
+      });
 
       // Generate unique order ID
       const orderId = this.generateOrderId();
@@ -169,22 +201,14 @@ export default class PaymentController {
   /**
    * Handle myPOS IPC notification
    * POST /api/payment/notify
+   * 
+   * Note: Security validation is handled by validateMyPosWebhook middleware
+   * This controller focuses on business logic: processing payments and updating orders
    */
   public handleIPCNotification: RequestHandler = async (req, res) => {
     try {
-      // Check if body is empty or undefined
-      if (!req.body || Object.keys(req.body).length === 0) {
-        logger.error('Webhook body is empty', this.logContext);
-        res.status(200).send('OK');
-        return;
-      }
-
-      // Process and verify webhook
+      // Process and verify webhook (signature validation)
       const webhookResult = this.myposCheckoutService.processWebhookNotification(req.body);
-
-      console.log('===============================================');
-      console.log('webhookResult', req.body);
-      console.log('===============================================');
 
       if (!webhookResult.isValid) {
         logger.error('Invalid webhook signature', this.logContext);
@@ -192,7 +216,7 @@ export default class PaymentController {
         return;
       }
 
-      const { orderID, amount, currency, transactionRef, status, statusMsg } = webhookResult;
+      const { orderID, amount, currency, transactionRef, isSuccess } = webhookResult;
 
       if (!orderID) {
         logger.error('No OrderID in webhook', this.logContext);
@@ -213,9 +237,14 @@ export default class PaymentController {
       }
 
       // CRITICAL: Verify amount matches expected amount
-      if (amount && Math.abs(amount - order.expectedAmount) > 0.01) {
-        logger.error(`FRAUD ATTEMPT! Amount mismatch for order ${orderID}`, this.logContext);
-        
+      // Use price validation service for extra security
+      const isValidAmount = this.priceValidationService.validatePaymentAmount(
+        orderID,
+        amount || 0,
+        order.expectedAmount
+      );
+
+      if (!isValidAmount) {
         order.status = 'fraud_attempt';
         order.paidAmount = amount;
         await order.save();
@@ -224,9 +253,9 @@ export default class PaymentController {
         return;
       }
 
-      // Check payment status
-      if (status === '0') {
-        // Payment successful
+      // Check payment status based on IPCmethod
+      if (isSuccess) {
+        // Payment successful (IPCPurchaseNotify or IPCPurchaseOK)
         order.status = 'paid';
         order.paidAmount = amount;
         order.paidAt = new Date();
@@ -261,11 +290,11 @@ export default class PaymentController {
         // await this.generateDocuments(order);
         // await this.sendDocumentsToCustomer(order);
       } else {
-        // Payment failed
+        // Payment failed or cancelled (IPCPurchaseRollback or IPCPurchaseCancel)
         order.status = 'failed';
         order.failedAt = new Date();
         await order.save();
-        logger.info(`Payment failed for order ${orderID}: ${statusMsg}`);
+        logger.info(`Payment failed for order ${orderID}. Method: ${webhookResult.method}`);
 
         // Update the corresponding document
         try {

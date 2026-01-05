@@ -117,9 +117,16 @@ export default class Config {
       cancelUrl: process.env.MYPOS_CANCEL_URL || `${this.frontendUrl}/payment/cancel`,
       webhookSecret: process.env.MYPOS_WEBHOOK_SECRET || '',
       
-      // TEMPORARY: Skip signature verification in test mode if certificate is incorrect
-      // Set to 'true' to bypass signature verification (ONLY for testing!)
-      skipSignatureVerification: process.env.MYPOS_SKIP_SIGNATURE_VERIFICATION === 'true',
+      // Skip signature verification by default (since we don't have myPOS's server certificate)
+      // Set to 'false' to enable if you have MYPOS_SERVER_CERT configured
+      skipSignatureVerification: process.env.MYPOS_SKIP_SIGNATURE_VERIFICATION !== 'false',
+      
+      // Allowed IP addresses for webhook requests (optional - leave empty to allow all and just log IPs)
+      // Add myPOS server IPs here after seeing them in logs
+      // Example: ['34.65.222.69', '35.195.100.']
+      allowedWebhookIPs: process.env.MYPOS_ALLOWED_IPS 
+        ? process.env.MYPOS_ALLOWED_IPS.split(',').map(ip => ip.trim())
+        : [],
     };
   })();
 

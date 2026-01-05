@@ -346,10 +346,11 @@ export default class MyPosCheckoutService {
    * Verify signature from myPOS webhook notification
    * 
    * According to myPOS docs:
-   * - Signature is SHA-256 RSA signature (BASE64 encoded)
-   * - All parameters EXCEPT Signature are concatenated in order
-   * - Signature is ALWAYS THE LAST PARAMETER
-   * - Verify using OUR merchant public certificate (same keypair used for signing requests)
+   * - Signature is SHA-256 HASH for all properties in the command
+   * - Signature is ALWAYS THE LAST PARAMETER IN THE POST
+   * - Signature is NOT used to calculate the hash
+   * - It's an RSA-SHA256 signature (RSA signature of SHA-256 hash)
+   * - Verify using our merchant public certificate (MYPOS_TEST_PUBLIC_CERT or MYPOS_PUBLIC_CERT)
    * 
    * @param data - Webhook data including Signature
    * @returns true if signature is valid
@@ -357,30 +358,53 @@ export default class MyPosCheckoutService {
   private verifyWebhookSignature(data: Record<string, any>): boolean {
     try {
       const signature = data.Signature;
-      if (!signature || !this.config.mypos.publicCert) {
+      if (!signature) {
+        logger.error('Webhook missing signature', 'MyPosCheckoutService');
         return false;
       }
 
-      // Build data string (all params except Signature, in order they appear)
-      const dataString = Object.keys(data)
-        .filter(key => key !== 'Signature')
-        .map(key => data[key])
-        .join('');
+      // Use our merchant public certificate for verification
+      // NOTE: We should use myPOS's server certificate, but only have the merchant cert from config pack
+      const publicCert = this.config.mypos.publicCert;
+      
+      if (!publicCert) {
+        logger.error('No merchant public certificate available', 'MyPosCheckoutService');
+        return false;
+      }
 
-      // Verify signature using our merchant public certificate
+      // Build data string: concatenate all values EXCEPT Signature
+      // For IPCPurchaseNotify, the order from your logs is:
+      // IPCmethod, SID, Amount, Currency, OrderID, IPC_Trnref, RequestSTAN, RequestDateTime,
+      // PaymentMethod, BillingDescriptor, CustomerEmail, CustomerFirstNames, CustomerFamilyName, CustomerPhone, PAN
+      const webhookKeys = [
+        'IPCmethod', 'SID', 'Amount', 'Currency', 'OrderID', 'IPC_Trnref',
+        'RequestSTAN', 'RequestDateTime', 'PaymentMethod', 'BillingDescriptor',
+        'CustomerEmail', 'CustomerFirstNames', 'CustomerFamilyName', 'CustomerPhone', 'PAN'
+      ];
+      
+      const dataStringParts: string[] = [];
+      for (const key of webhookKeys) {
+        if (data.hasOwnProperty(key)) {
+          dataStringParts.push(String(data[key]));
+        }
+      }
+      
+      const dataString = dataStringParts.join('');
+
+      // Verify RSA-SHA256 signature
       const verifier = crypto.createVerify('RSA-SHA256');
       verifier.update(dataString, 'utf8');
       verifier.end();
+      
+      const isValid = verifier.verify(publicCert, signature, 'base64');
 
-      const isValid = verifier.verify(
-        this.config.mypos.publicCert,
-        signature,
-        'base64'
-      );
+      if (!isValid) {
+        logger.error(`Webhook signature verification failed | Using merchant public cert | Data length: ${dataString.length}`, 'MyPosCheckoutService');
+      }
 
       return isValid;
     } catch (error: any) {
-      logger.error(`Webhook signature verification failed: ${error.message}`, 'MyPosCheckoutService');
+      logger.error(`Webhook signature verification error: ${error.message}`, 'MyPosCheckoutService');
       return false;
     }
   }
@@ -390,11 +414,10 @@ export default class MyPosCheckoutService {
    * 
    * Security layers:
    * 1. HTTPS/TLS - Railway provides SSL certificate for secure connection
-   * 2. Signature verification - Verify webhook is from myPOS using our merchant public cert
+   * 2. Signature verification - Verify webhook using merchant public cert (MYPOS_TEST_PUBLIC_CERT / MYPOS_PUBLIC_CERT)
    * 3. Amount verification - Always verify payment amount matches order
    * 
    * Note: Signature verification can be disabled with MYPOS_SKIP_SIGNATURE_VERIFICATION=true
-   * This is useful for testing when you haven't set up RSA keys yet.
    */
   public processWebhookNotification(data: Record<string, any>): {
     isValid: boolean;
@@ -403,8 +426,7 @@ export default class MyPosCheckoutService {
     amount?: number;
     currency?: string;
     transactionRef?: string;
-    status?: string;
-    statusMsg?: string;
+    isSuccess?: boolean;
   } {
     try {
       // Verify signature (if enabled and certificate is available)
@@ -417,6 +439,11 @@ export default class MyPosCheckoutService {
         }
       }
 
+      // Determine payment success based on IPCmethod
+      // IPCPurchaseNotify or IPCPurchaseOK = Payment successful
+      // IPCPurchaseRollback or IPCPurchaseCancel = Payment failed/cancelled
+      const isSuccess = data.IPCmethod === 'IPCPurchaseNotify' || data.IPCmethod === 'IPCPurchaseOK';
+
       return {
         isValid: true,
         method: data.IPCmethod,
@@ -424,8 +451,7 @@ export default class MyPosCheckoutService {
         amount: data.Amount ? parseFloat(data.Amount) : undefined,
         currency: data.Currency,
         transactionRef: data.IPC_Trnref,
-        status: data.Status,
-        statusMsg: data.StatusMsg,
+        isSuccess,
       };
     } catch (error: any) {
       logger.error(`Failed to process webhook: ${error.message}`, 'MyPosCheckoutService');

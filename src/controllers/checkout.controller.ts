@@ -107,7 +107,7 @@ export default class CheckoutController {
       }
 
       // Handle successful payment
-      if (result.method === 'IPCPurchaseNotify' && result.status === '0') {
+      if (result.isSuccess) {
         const orderId = result.orderID;
 
         if (orderId && mongoose.isValidObjectId(orderId)) {
@@ -116,7 +116,7 @@ export default class CheckoutController {
               'orderData.paid': true,
               'orderData.paidAt': new Date(),
               'orderData.paymentLinkId': result.transactionRef,
-              'orderData.amount': result.amount ? result.amount / 100 : undefined,
+              'orderData.amount': result.amount,
               'orderData.currency': result.currency,
             },
           });
@@ -125,8 +125,8 @@ export default class CheckoutController {
         }
       }
 
-      // Handle canceled payment
-      if (result.method === 'IPCPurchaseCancel') {
+      // Handle canceled/failed payment
+      if (!result.isSuccess) {
         const orderId = result.orderID;
 
         if (orderId && mongoose.isValidObjectId(orderId)) {
