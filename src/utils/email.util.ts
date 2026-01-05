@@ -4,9 +4,9 @@ import nodemailer from 'nodemailer';
 
 import handlebars from 'handlebars';
 
-import ErrorUtil from './../utils/error.util';
+import ErrorUtil from './error.util';
 
-import Config from './../config';
+import Config from '../config';
 import CustomError from './custom-error.utils';
 
 export enum EmailType {

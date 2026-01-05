@@ -50,7 +50,7 @@ export default class CheckoutController {
       // Convert amount to minor units (cents)
       const amountInCents = Math.round(amount * 100);
 
-      logger.info(`Creating checkout for order: ${orderId}`, this.logContext);
+      logger.info(`Creating checkout for order: ${orderId}`);
 
       // Build purchase form
       const formHTML = this.checkoutService.buildPurchaseForm({
@@ -60,10 +60,10 @@ export default class CheckoutController {
         URL_OK: `${this.config.mypos.successUrl}?orderId=${orderId}`,
         URL_Cancel: `${this.config.mypos.cancelUrl}?orderId=${orderId}`,
         URL_Notify: `${this.config.frontendUrl}/api/checkout/webhook/notify`,
-        CustomerEmail: customerEmail,
+        CustomerEmail: customerEmail || 'noemail@gotovdoc.bg',
+        CustomerFirstNames: customerFirstName || 'Customer', // Note: plural "Names"
+        CustomerFamilyName: customerLastName || 'User', // Note: "FamilyName"
         CustomerPhone: customerPhone,
-        CustomerFirstName: customerFirstName,
-        CustomerLastName: customerLastName,
         Note: note || 'Document payment',
       });
 
@@ -75,7 +75,7 @@ export default class CheckoutController {
         },
       });
 
-      logger.info(`Checkout form generated for order: ${orderId}`, this.logContext);
+      logger.info(`Checkout form generated for order: ${orderId}`);
 
       // Return form HTML for frontend to render and auto-submit
       res.json({
@@ -95,7 +95,7 @@ export default class CheckoutController {
   public handleWebhookNotify: RequestHandler = async (req, res) => {
     try {
       const webhookData = req.body;
-      logger.info(`Received webhook notification: ${JSON.stringify(webhookData)}`, this.logContext);
+      logger.info(`Received webhook notification: ${JSON.stringify(webhookData)}`);
 
       // Process and verify webhook
       const result = this.checkoutService.processWebhookNotification(webhookData);
@@ -121,7 +121,7 @@ export default class CheckoutController {
             },
           });
 
-          logger.info(`Payment successful for order: ${orderId}`, this.logContext);
+          logger.info(`Payment successful for order: ${orderId}`);
         }
       }
 
@@ -137,7 +137,7 @@ export default class CheckoutController {
             },
           });
 
-          logger.info(`Payment canceled for order: ${orderId}`, this.logContext);
+          logger.info(`Payment canceled for order: ${orderId}`);
         }
       }
 
@@ -161,7 +161,7 @@ export default class CheckoutController {
         throw new CustomError(400, 'Invalid orderId');
       }
 
-      logger.info(`Getting transaction status for order: ${orderId}`, this.logContext);
+      logger.info(`Getting transaction status for order: ${orderId}`);
 
       const status = await this.checkoutService.getTransactionStatus({
         OrderID: orderId,
@@ -202,7 +202,7 @@ export default class CheckoutController {
       // Convert amount to minor units (cents)
       const amountInCents = Math.round(amount * 100);
 
-      logger.info(`Creating refund for order: ${orderId}`, this.logContext);
+      logger.info(`Creating refund for order: ${orderId}`);
 
       const refundResult = await this.checkoutService.createRefund({
         OrderID: orderId,
@@ -222,7 +222,7 @@ export default class CheckoutController {
         });
       }
 
-      logger.info(`Refund processed for order: ${orderId}`, this.logContext);
+      logger.info(`Refund processed for order: ${orderId}`);
 
       res.json({
         success: true,
@@ -240,7 +240,7 @@ export default class CheckoutController {
    */
   public createTestPayment: RequestHandler = async (req, res) => {
     try {
-      logger.info('Creating test payment form', this.logContext);
+      logger.info('Creating test payment form');
 
       // Create a test document in the database
       const testDocument = await Document.create({
@@ -263,12 +263,12 @@ export default class CheckoutController {
         URL_Cancel: `https://gotovdoc.bg/payment/cancel?orderId=${testDocument._id}`,
         URL_Notify: `https://gotovdoc-backend-production.up.railway.app/api/checkout/webhook/notify`,
         CustomerEmail: 'test@gotovdoc.bg',
-        CustomerFirstName: 'Иван',
-        CustomerLastName: 'Тестов',
+        CustomerFirstNames: 'Иван', // Note: plural "Names"
+        CustomerFamilyName: 'Тестов', // Note: "FamilyName"
         Note: 'Тестово плащане - GotovDoc',
       });
 
-      logger.info(`Test payment form created for order: ${testDocument._id}`, this.logContext);
+      logger.info(`Test payment form created for order: ${testDocument._id}`);
 
       // Return HTML form that will auto-submit
       res.status(200).send(formHTML);

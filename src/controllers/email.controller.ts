@@ -8,9 +8,9 @@ import CustomError from '../utils/custom-error.utils';
 
 // import { EmailType, EmailUtil } from './../utils/email.util';
 
-import { EmailType, EmailUtil } from './../utils/email.util';
+import { EmailType, EmailUtil } from '../utils/email.util';
 
-import Config from './../config';
+import Config from '../config';
 
 export default class EmailController {
   

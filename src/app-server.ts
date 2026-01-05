@@ -1,7 +1,7 @@
 import logger from '@ipi-soft/logger';
 import cors from 'cors';
 import express from 'express';
-import { json } from 'body-parser';
+import { json, urlencoded } from 'body-parser';
 import { IncomingMessage, ServerResponse } from 'http';
 
 import MainRouter from './routes/main.router';
@@ -40,6 +40,12 @@ export default class AppServer {
     }));
 
     app.use(json({
+      limit: '300mb',
+    }));
+
+    // Parse URL-encoded bodies (for myPOS notifications)
+    app.use(urlencoded({
+      extended: true,
       limit: '300mb',
     }));
 

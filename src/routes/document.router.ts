@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 import CatchUtil from '../utils/catch.util';
 
-import DocumentController from './../controllers/document.controller';
+import DocumentController from '../controllers/document.controller';
 
 const useCatch = CatchUtil.getUseCatch();
 const documentController = new DocumentController();

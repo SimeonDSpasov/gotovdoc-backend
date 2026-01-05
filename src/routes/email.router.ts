@@ -2,7 +2,7 @@ import { Router } from 'express';
 
 import CatchUtil from '../utils/catch.util';
 
-import EmailController from './..//controllers/email.controller';
+import EmailController from '../controllers/email.controller';
 
 const useCatch = CatchUtil.getUseCatch();
 const emailController = new EmailController();

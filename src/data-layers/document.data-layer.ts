@@ -1,8 +1,8 @@
-import mongoose, { FilterQuery } from 'mongoose';
+import mongoose, { FilterQuery, UpdateQuery } from 'mongoose';
 
-import CustomError from './../utils/custom-error.utils';
+import CustomError from '../utils/custom-error.utils';
 
-import { Document, DocumentDoc, IDocument } from './../models/document.model';
+import { Document, DocumentDoc, IDocument } from '../models/document.model';
 
 export default class DocumentDataLayer {
 
@@ -62,6 +62,40 @@ export default class DocumentDataLayer {
       });
 
     return documents;
+  }
+
+  public async update(id: string | mongoose.Types.ObjectId, update: UpdateQuery<IDocument>, logContext: string): Promise<DocumentDoc> {
+    logContext = `${logContext} -> ${this.logContext} -> update()`;
+
+    if (!mongoose.isValidObjectId(id)) {
+      throw new CustomError(400, `Invalid ID`);
+    }
+
+    const document = await Document.findByIdAndUpdate(id, update, { new: true })
+      .catch(err => {
+        throw new CustomError(500, err.message, `${logContext} -> findByIdAndUpdate() -> id: ${id.toString()} | update: ${JSON.stringify(update)}`);
+      });
+
+    if (!document) {
+      throw new CustomError(404, `No document found`);
+    }
+
+    return document;
+  }
+
+  public async updateByFilter(filter: FilterQuery<IDocument>, update: UpdateQuery<IDocument>, logContext: string): Promise<DocumentDoc> {
+    logContext = `${logContext} -> ${this.logContext} -> updateByFilter()`;
+
+    const document = await Document.findOneAndUpdate(filter, update, { new: true })
+      .catch(err => {
+        throw new CustomError(500, err.message, `${logContext} -> findOneAndUpdate() -> filter: ${JSON.stringify(filter)} | update: ${JSON.stringify(update)}`);
+      });
+
+    if (!document) {
+      throw new CustomError(404, `No document found`);
+    }
+
+    return document;
   }
 
   private static instance: DocumentDataLayer;

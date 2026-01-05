@@ -68,7 +68,7 @@ export default class AuthController {
     const accessToken = this.tokenUtil.getAccessToken(user._id);
     const refreshToken = await this.tokenUtil.getRefreshToken(user._id, logContext);
 
-    logger.info(`User logged in: ${user.email}`, logContext);
+    logger.info(`User logged in: ${user.email}`);
 
     res.header('Authorization-Access', accessToken);
     res.header('Authorization-Refresh', refreshToken);
@@ -101,7 +101,7 @@ export default class AuthController {
 
     const user = await this.userDataLayer.create(createUser, logContext);
 
-    logger.info(`New user registered: ${user.email}`, logContext);
+    logger.info(`New user registered: ${user.email}`);
 
     // Send welcome email (optional)
     try {
@@ -146,7 +146,7 @@ export default class AuthController {
 
     await this.userDataLayer.updatePassword(user, newPassword, logContext);
 
-    logger.info(`Password changed for user: ${user.email}`, logContext);
+    logger.info(`Password changed for user: ${user.email}`);
 
     // Send password change notification email (optional)
     try {
@@ -185,7 +185,7 @@ export default class AuthController {
 
     const resetPasswordLink = `${this.config.frontendUrl}/reset-password?token=${token}`;
 
-    logger.info(`Password reset requested for user: ${user.email}`, logContext);
+    logger.info(`Password reset requested for user: ${user.email}`);
 
     const emailData = {
       toEmail: user.email,
@@ -231,7 +231,7 @@ export default class AuthController {
 
     await this.userDataLayer.updatePassword(user, password, logContext);
 
-    logger.info(`Password reset completed for user: ${user.email}`, logContext);
+    logger.info(`Password reset completed for user: ${user.email}`);
 
     // Send password reset confirmation email (optional)
     try {

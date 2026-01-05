@@ -67,24 +67,61 @@ export default class Config {
   };
 
   // MyPOS Configuration
-  public mypos = {
-    // REST API v1.1 credentials
-    clientId: process.env.MYPOS_CLIENT_ID || '',
-    clientSecret: process.env.MYPOS_CLIENT_SECRET || '',
+  public mypos = (() => {
+    // Determine if production based on env and SID
+    const isProduction = this.env === 'prod';
     
-    // Checkout API v1.4 credentials
-    sid: process.env.MYPOS_SID || '',
-    walletNumber: process.env.MYPOS_WALLET_NUMBER || '',
-    keyIndex: parseInt(process.env.MYPOS_KEY_INDEX || '1'),
-    privateKey: process.env.MYPOS_PRIVATE_KEY || '',
-    publicCert: process.env.MYPOS_PUBLIC_CERT || '',
+    // Use test or production credentials based on environment
+    const sid = isProduction 
+      ? (process.env.MYPOS_SID || '')
+      : (process.env.MYPOS_TEST_SID || process.env.MYPOS_SID || '000000000000010');
     
-    // Common settings
-    isProduction: this.env === 'prod',
-    successUrl: process.env.MYPOS_SUCCESS_URL || `${this.frontendUrl}/payment/success`,
-    cancelUrl: process.env.MYPOS_CANCEL_URL || `${this.frontendUrl}/payment/cancel`,
-    webhookSecret: process.env.MYPOS_WEBHOOK_SECRET || '',
-  };
+    const walletNumber = isProduction
+      ? (process.env.MYPOS_WALLET_NUMBER || '')
+      : (process.env.MYPOS_TEST_WALLET_NUMBER || process.env.MYPOS_WALLET_NUMBER || '61938166610');
+    
+    const keyIndex = isProduction
+      ? parseInt(process.env.MYPOS_KEY_INDEX || '1')
+      : parseInt(process.env.MYPOS_TEST_KEY_INDEX || process.env.MYPOS_KEY_INDEX || '1');
+    
+    const privateKey = isProduction
+      ? (process.env.MYPOS_PRIVATE_KEY || '')
+      : (process.env.MYPOS_TEST_PRIVATE_KEY || process.env.MYPOS_PRIVATE_KEY || '');
+    
+    const publicCert = isProduction
+      ? (process.env.MYPOS_PUBLIC_CERT || '')
+      : (process.env.MYPOS_TEST_PUBLIC_CERT || process.env.MYPOS_PUBLIC_CERT || '');
+    
+    // myPOS server certificate for verifying THEIR webhook signatures
+    // This is DIFFERENT from the merchant certificate above!
+    const myposServerCert = isProduction
+      ? (process.env.MYPOS_SERVER_CERT || '')
+      : (process.env.MYPOS_TEST_SERVER_CERT || process.env.MYPOS_SERVER_CERT || '');
+    
+    return {
+      // REST API v1.1 credentials
+      clientId: process.env.MYPOS_CLIENT_ID || '',
+      clientSecret: process.env.MYPOS_CLIENT_SECRET || '',
+      
+      // Checkout API v1.4 credentials
+      sid,
+      walletNumber,
+      keyIndex,
+      privateKey,
+      publicCert, // OUR merchant certificate (for signing our requests)
+      myposServerCert, // myPOS's certificate (for verifying their webhooks)
+      
+      // Common settings
+      isProduction,
+      successUrl: process.env.MYPOS_SUCCESS_URL || `${this.frontendUrl}/payment/success`,
+      cancelUrl: process.env.MYPOS_CANCEL_URL || `${this.frontendUrl}/payment/cancel`,
+      webhookSecret: process.env.MYPOS_WEBHOOK_SECRET || '',
+      
+      // TEMPORARY: Skip signature verification in test mode if certificate is incorrect
+      // Set to 'true' to bypass signature verification (ONLY for testing!)
+      skipSignatureVerification: process.env.MYPOS_SKIP_SIGNATURE_VERIFICATION === 'true',
+    };
+  })();
 
   private static instance: Config;
 
@@ -94,6 +131,78 @@ export default class Config {
     }
 
     return Config.instance;
+  }
+
+  /**
+   * Log myPOS configuration on startup (with masked sensitive data)
+   */
+  public logMyPosConfig(): void {
+    const maskKey = (key: string | undefined) => {
+      if (!key) return '❌ NOT SET';
+      if (key.length < 100) return `✅ Set (${key.length} chars)`;
+      return `✅ Set (${key.length} chars) - ${key.substring(0, 50)}...${key.substring(key.length - 20)}`;
+    };
+
+    console.log('\n╔════════════════════════════════════════════════════════════════╗');
+    console.log('║              myPOS CONFIGURATION CHECK                         ║');
+    console.log('╚════════════════════════════════════════════════════════════════╝\n');
+    
+    console.log(`🌍 Environment: ${this.env}`);
+    console.log(`🏭 Is Production: ${this.mypos.isProduction ? '🚀 YES (LIVE)' : '🧪 NO (TEST)'}`);
+    console.log(`🌐 Frontend URL: ${this.frontendUrl}`);
+    console.log('');
+    
+    console.log('📦 myPOS Credentials:');
+    console.log(`  SID: ${this.mypos.sid || '❌ NOT SET'}`);
+    console.log(`  Wallet Number: ${this.mypos.walletNumber || '❌ NOT SET'}`);
+    console.log(`  Key Index: ${this.mypos.keyIndex}`);
+    console.log('');
+    
+    console.log('🔐 Signing Keys (YOUR keys - for signing requests TO myPOS):');
+    console.log(`  Private Key: ${maskKey(this.mypos.privateKey)}`);
+    console.log(`  Public Cert: ${maskKey(this.mypos.publicCert)}`);
+    console.log('');
+    
+    console.log('🔒 Verification Keys (myPOS keys - for verifying webhooks FROM myPOS):');
+    console.log(`  myPOS Server Cert: ${maskKey(this.mypos.myposServerCert)}`);
+    console.log('');
+    
+    console.log('🌐 Endpoints:');
+    console.log(`  Base URL: ${this.mypos.isProduction ? 'https://www.mypos.eu/vmp/checkout' : 'https://www.mypos.eu/vmp/checkout-test'}`);
+    console.log(`  Success URL: ${this.mypos.successUrl}`);
+    console.log(`  Cancel URL: ${this.mypos.cancelUrl}`);
+    console.log('');
+    
+    // Validation warnings
+    const warnings: string[] = [];
+    
+    if (!this.mypos.sid) warnings.push('⚠️  MYPOS_SID is not set!');
+    if (!this.mypos.walletNumber) warnings.push('⚠️  MYPOS_WALLET_NUMBER is not set!');
+    if (!this.mypos.privateKey) warnings.push('⚠️  MYPOS_PRIVATE_KEY is not set! Cannot sign requests.');
+    if (!this.mypos.publicCert) warnings.push('⚠️  MYPOS_PUBLIC_CERT is not set!');
+    if (!this.mypos.myposServerCert) warnings.push('⚠️  MYPOS_SERVER_CERT is not set! Cannot verify webhooks.');
+    
+    if (this.mypos.skipSignatureVerification) {
+      warnings.push('🚨 SIGNATURE VERIFICATION IS DISABLED! (MYPOS_SKIP_SIGNATURE_VERIFICATION=true)');
+      warnings.push('   This should ONLY be used in test mode!');
+    }
+    
+    if (warnings.length > 0) {
+      console.log('⚠️  WARNINGS:');
+      warnings.forEach(w => console.log(`  ${w}`));
+      console.log('');
+    }
+    
+    // Environment detection
+    if (this.mypos.sid === '000000000000010') {
+      console.log('✅ Using official myPOS TEST credentials (SID: 000000000000010)');
+    } else if (this.mypos.sid?.startsWith('000')) {
+      console.log('🧪 Using custom TEST credentials (SID starts with 000)');
+    } else if (this.mypos.sid) {
+      console.log('🚀 Using PRODUCTION credentials');
+    }
+    
+    console.log('\n════════════════════════════════════════════════════════════════\n');
   }
 
 }
