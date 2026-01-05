@@ -44,6 +44,10 @@ export interface IPCPurchaseRequest {
   CustomerFirstNames: string; // Required when PaymentParametersRequired = 1 (note: plural)
   CustomerFamilyName: string; // Required when PaymentParametersRequired = 1
   CustomerPhone?: string;
+  CustomerCountry?: string; // ISO 3166-1 alpha-3 (e.g. DEU, BGR, USA)
+  CustomerCity?: string;
+  CustomerZipCode?: string;
+  CustomerAddress?: string;
   CustomerIP?: string;
   Note?: string;
   CartItems?: CartItem[]; // Array of cart items
@@ -90,31 +94,8 @@ export default class MyPosCheckoutService {
     if (!this.config.mypos.privateKey || !this.config.mypos.publicCert) {
       const envType = this.config.mypos.isProduction ? 'production' : 'test';
       logger.error(
-        `Missing RSA keys for ${envType} environment. ` +
-        `Generate keys in myPOS portal: https://merchant.mypos.com`,
+        `Missing RSA keys for ${envType} environment`,
         'MyPosCheckoutService'
-      );
-      
-      if (!this.config.mypos.isProduction) {
-        logger.info(
-          'To get test RSA keys: ' +
-          '1) Log in to myPOS portal, ' +
-          '2) Create/select test store, ' +
-          '3) Generate Configuration Pack or Key Pair, ' +
-          '4) Add to .env: MYPOS_PRIVATE_KEY and MYPOS_PUBLIC_CERT'
-        );
-      }
-    } else {
-      // Log successful configuration
-      const envType = this.config.mypos.isProduction ? 'PRODUCTION' : 'TEST';
-      const baseURL = this.config.mypos.isProduction
-        ? 'https://www.mypos.eu/vmp/checkout'
-        : 'https://www.mypos.eu/vmp/checkout-test';
-      
-      logger.info(
-        `myPOS Checkout configured for ${envType} environment | ` +
-        `SID: ${this.config.mypos.sid} | ` +
-        `Base URL: ${baseURL}`
       );
     }
   }
@@ -131,21 +112,16 @@ export default class MyPosCheckoutService {
    * Per myPOS docs: concatenate all parameter VALUES (not keys) in order, then sign with SHA1
    */
   private generateSignature(data: Record<string, any>): string {
-    console.log('data', data);
     try {
       // Concatenate all values in the exact order they appear in the request
       const dataString = Object.values(data).join('');
-      
-      logger.info(`Data for signature: ${dataString}`);
       
       // Create signature using private key with SHA1
       const sign = crypto.createSign('SHA1');
       sign.update(dataString);
       sign.end();
       
-      console.log('this.config.mypos.privateKey', this.config.mypos.privateKey);
       const signature = sign.sign(this.config.mypos.privateKey, 'base64');
-      logger.info(`Generated signature: ${signature.substring(0, 50)}...`);
       
       return signature;
     } catch (error: any) {
@@ -178,7 +154,8 @@ export default class MyPosCheckoutService {
         URL_Notify: params.URL_Notify,
         CardTokenRequest: '0',
         KeyIndex: this.config.mypos.keyIndex,
-        PaymentParametersRequired: '1',
+        PaymentParametersRequired: '1', // 1 = All fields required, 2 = Email only, 3 = No fields
+        PaymentMethod: '1', // 1 = Card only, 2 = iCard only, 3 = Both Card and iCard
       };
 
       // Add REQUIRED customer parameters (when PaymentParametersRequired = 1)
@@ -188,9 +165,16 @@ export default class MyPosCheckoutService {
       requestData.customerfamilyname = params.CustomerFamilyName;
       
       // Add optional customer parameters (also lowercase)
-      if (params.CustomerPhone) requestData.customerphone = params.CustomerPhone;
-      if (params.CustomerIP) requestData.customerip = params.CustomerIP;
-      if (params.Note) requestData.Note = params.Note;
+      // IMPORTANT: All fields must be present in exact order for signature, even if empty
+      requestData.customerphone = params.CustomerPhone || '';
+      requestData.customercountry = params.CustomerCountry || '';
+      requestData.customercity = params.CustomerCity || '';
+      requestData.customerzipcode = params.CustomerZipCode || '';
+      requestData.customeraddress = params.CustomerAddress || '';
+      
+      // Note and Source
+      requestData.Note = params.Note || '';
+      requestData.Source = ''; // Always empty per myPOS docs
 
       // Add cart items if provided
       if (params.CartItems && params.CartItems.length > 0) {
@@ -207,17 +191,12 @@ export default class MyPosCheckoutService {
         });
       }
 
-      // Add delivery cost if provided
-      if (params.Delivery) {
-        requestData.Delivery = params.Delivery.toFixed(2);
-      }
+      // Add delivery cost (0 if not provided)
+      requestData.Delivery = params.Delivery ? params.Delivery.toFixed(2) : '0';
 
       // Generate signature BEFORE adding it
       const signature = this.generateSignature(requestData);
       requestData.Signature = signature;
-
-      logger.info(`Created purchase params for OrderID: ${params.OrderID}`);
-      logger.info(`Amount: ${params.Amount}, SID: ${this.config.mypos.sid}`);
 
       return requestData;
     } catch (error: any) {
@@ -245,8 +224,6 @@ export default class MyPosCheckoutService {
       // Generate signature
       const signature = this.generateSignature(requestData);
       requestData.Signature = signature;
-
-      logger.info(`Getting transaction status for OrderID: ${params.OrderID}`);
 
       // Determine base URL
       const baseURL = this.config.mypos.isProduction
@@ -290,8 +267,6 @@ export default class MyPosCheckoutService {
       const signature = this.generateSignature(requestData);
       requestData.Signature = signature;
 
-      logger.info(`Creating refund for OrderID: ${params.OrderID}`);
-
       // Determine base URL
       const baseURL = this.config.mypos.isProduction
         ? 'https://www.mypos.eu/vmp/checkout'
@@ -319,7 +294,7 @@ export default class MyPosCheckoutService {
     const requestData: Record<string, any> = {
       IPCmethod: IPCMethod.PURCHASE,
       IPCVersion: '1.4',
-      IPCLanguage: 'en',
+      IPCLanguage: 'bg',
       SID: this.config.mypos.sid,
       walletnumber: this.config.mypos.walletNumber, // LOWERCASE per myPOS docs
       Amount: params.Amount,
@@ -330,7 +305,8 @@ export default class MyPosCheckoutService {
       URL_Notify: params.URL_Notify,
       CardTokenRequest: '0',
       KeyIndex: this.config.mypos.keyIndex,
-      PaymentParametersRequired: '1',
+      PaymentParametersRequired: '1', // 1 = All fields required, 2 = Email only, 3 = No fields
+      PaymentMethod: '1', // 1 = Card only, 2 = iCard only, 3 = Both Card and iCard
     };
 
     // Add required customer parameters (MUST be lowercase)
@@ -381,16 +357,7 @@ export default class MyPosCheckoutService {
   private verifyWebhookSignature(data: Record<string, any>): boolean {
     try {
       const signature = data.Signature;
-      if (!signature) {
-        logger.info('[verifyWebhookSignature] No signature provided');
-        return false;
-      }
-
-      // Use our merchant public certificate to verify webhook signature
-      const publicCert = this.config.mypos.publicCert;
-
-      if (!publicCert) {
-        logger.info('[verifyWebhookSignature] Merchant public certificate not configured');
+      if (!signature || !this.config.mypos.publicCert) {
         return false;
       }
 
@@ -400,25 +367,20 @@ export default class MyPosCheckoutService {
         .map(key => data[key])
         .join('');
 
-      logger.info(`[verifyWebhookSignature] Data string (first 100 chars): ${dataString.substring(0, 100)}...`);
-      logger.info(`[verifyWebhookSignature] Data string length: ${dataString.length}`);
-      logger.info(`[verifyWebhookSignature] Using public cert: ${publicCert.substring(0, 50)}...`);
-
       // Verify signature using our merchant public certificate
       const verifier = crypto.createVerify('RSA-SHA256');
       verifier.update(dataString, 'utf8');
       verifier.end();
 
       const isValid = verifier.verify(
-        publicCert,
+        this.config.mypos.publicCert,
         signature,
         'base64'
       );
 
-      logger.info(`[verifyWebhookSignature] Signature verification result: ${isValid}`);
       return isValid;
     } catch (error: any) {
-      logger.error(`[verifyWebhookSignature] Error: ${error.message}`, 'MyPosCheckoutService');
+      logger.error(`Webhook signature verification failed: ${error.message}`, 'MyPosCheckoutService');
       return false;
     }
   }
@@ -445,27 +407,15 @@ export default class MyPosCheckoutService {
     statusMsg?: string;
   } {
     try {
-      logger.info(`[processWebhookNotification] Starting webhook processing...`);
-      logger.info(`[processWebhookNotification] Data type: ${typeof data}`);
-      logger.info(`[processWebhookNotification] Data keys: ${data ? Object.keys(data).join(', ') : 'NO DATA'}`);
-      
       // Verify signature (if enabled and certificate is available)
       if (!this.config.mypos.skipSignatureVerification) {
-        logger.info('[processWebhookNotification] Verifying signature...');
         const isSignatureValid = this.verifyWebhookSignature(data);
         
         if (!isSignatureValid) {
-          logger.error('[processWebhookNotification] ❌ INVALID SIGNATURE - Possible fraud attempt!', 'MyPosCheckoutService');
+          logger.error('Invalid webhook signature - possible fraud attempt', 'MyPosCheckoutService');
           return { isValid: false, method: data.IPCmethod || 'unknown' };
         }
-        
-        logger.info('[processWebhookNotification] ✅ Signature verified successfully');
-      } else {
-        logger.info('[processWebhookNotification] ⚠️  Signature verification DISABLED (relying on HTTPS/TLS security)');
       }
-      
-      logger.info(`[processWebhookNotification] ✅ Processing webhook: ${data.IPCmethod}`);
-      logger.info(`[processWebhookNotification] OrderID: ${data.OrderID}, Status: ${data.Status}, Amount: ${data.Amount}`);
 
       return {
         isValid: true,
@@ -478,8 +428,7 @@ export default class MyPosCheckoutService {
         statusMsg: data.StatusMsg,
       };
     } catch (error: any) {
-      logger.error(`[processWebhookNotification] Failed to process webhook: ${error.message}`, 'MyPosCheckoutService');
-      logger.error(`[processWebhookNotification] Error stack: ${error.stack}`, 'MyPosCheckoutService');
+      logger.error(`Failed to process webhook: ${error.message}`, 'MyPosCheckoutService');
       return { isValid: false, method: 'error' };
     }
   }
