@@ -345,12 +345,15 @@ export default class MyPosCheckoutService {
   /**
    * Verify signature from myPOS webhook notification
    * 
-   * According to myPOS docs:
-   * - Signature is SHA-256 HASH for all properties in the command
-   * - Signature is ALWAYS THE LAST PARAMETER IN THE POST
-   * - Signature is NOT used to calculate the hash
-   * - It's an RSA-SHA256 signature (RSA signature of SHA-256 hash)
-   * - Verify using our merchant public certificate (MYPOS_TEST_PUBLIC_CERT or MYPOS_PUBLIC_CERT)
+   * According to myPOS docs (https://developers.mypos.com/en/doc/online_payments/v1_4/336-authentication):
+   * 1. Save the signature from the POST data
+   * 2. Remove the Signature field from POST data
+   * 3. Concatenate all remaining values with '-' separator
+   * 4. Base64 encode the concatenated string
+   * 5. Extract public key from myPOS certificate
+   * 6. Verify signature using openssl_verify with SHA-256
+   * 
+   * IMPORTANT: Use myPOS's public certificate (MYPOS_PUBLIC_CERT), not the merchant's certificate!
    * 
    * @param data - Webhook data including Signature
    * @returns true if signature is valid
@@ -363,43 +366,39 @@ export default class MyPosCheckoutService {
         return false;
       }
 
-      // Use our merchant public certificate for verification
-      // NOTE: We should use myPOS's server certificate, but only have the merchant cert from config pack
-      const publicCert = this.config.mypos.publicCert;
+      // Use myPOS's public certificate to verify the webhook signature
+      // This is NOT the merchant's certificate - it's the certificate myPOS uses to sign webhooks
+      // Get from MYPOS_SERVER_CERT (production) or MYPOS_TEST_SERVER_CERT (test)
+      const myposCert = this.config.mypos.myposServerCert;
       
-      if (!publicCert) {
-        logger.error('No merchant public certificate available', 'MyPosCheckoutService');
+      if (!myposCert) {
+        logger.error('No myPOS server certificate available (MYPOS_SERVER_CERT or MYPOS_TEST_SERVER_CERT)', 'MyPosCheckoutService');
         return false;
       }
 
-      // Build data string: concatenate all values EXCEPT Signature
-      // For IPCPurchaseNotify, the order from your logs is:
-      // IPCmethod, SID, Amount, Currency, OrderID, IPC_Trnref, RequestSTAN, RequestDateTime,
-      // PaymentMethod, BillingDescriptor, CustomerEmail, CustomerFirstNames, CustomerFamilyName, CustomerPhone, PAN
-      const webhookKeys = [
-        'IPCmethod', 'SID', 'Amount', 'Currency', 'OrderID', 'IPC_Trnref',
-        'RequestSTAN', 'RequestDateTime', 'PaymentMethod', 'BillingDescriptor',
-        'CustomerEmail', 'CustomerFirstNames', 'CustomerFamilyName', 'CustomerPhone', 'PAN'
-      ];
+      // Create a copy of data without the Signature field
+      const dataWithoutSignature = { ...data };
+      delete dataWithoutSignature.Signature;
+
+      console.log(dataWithoutSignature);
+
+      // Concatenate all values with '-' separator (as shown in PHP example)
+      const values = Object.values(dataWithoutSignature).map(v => String(v));
+      const concatenated = values.join('-');
       
-      const dataStringParts: string[] = [];
-      for (const key of webhookKeys) {
-        if (data.hasOwnProperty(key)) {
-          dataStringParts.push(String(data[key]));
-        }
-      }
-      
-      const dataString = dataStringParts.join('');
+      // Base64 encode the concatenated string
+      const base64Data = Buffer.from(concatenated, 'utf8').toString('base64');
 
       // Verify RSA-SHA256 signature
       const verifier = crypto.createVerify('RSA-SHA256');
-      verifier.update(dataString, 'utf8');
+      verifier.update(base64Data, 'utf8');
       verifier.end();
       
-      const isValid = verifier.verify(publicCert, signature, 'base64');
+      // Decode the signature from base64 and verify
+      const isValid = verifier.verify(myposCert, signature, 'base64');
 
       if (!isValid) {
-        logger.error(`Webhook signature verification failed | Using merchant public cert | Data length: ${dataString.length}`, 'MyPosCheckoutService');
+        logger.error(`Webhook signature verification failed`, 'MyPosCheckoutService');
       }
 
       return isValid;
@@ -414,7 +413,7 @@ export default class MyPosCheckoutService {
    * 
    * Security layers:
    * 1. HTTPS/TLS - Railway provides SSL certificate for secure connection
-   * 2. Signature verification - Verify webhook using merchant public cert (MYPOS_TEST_PUBLIC_CERT / MYPOS_PUBLIC_CERT)
+   * 2. Signature verification - Verify webhook using myPOS's public certificate (MYPOS_PUBLIC_CERT)
    * 3. Amount verification - Always verify payment amount matches order
    * 
    * Note: Signature verification can be disabled with MYPOS_SKIP_SIGNATURE_VERIFICATION=true

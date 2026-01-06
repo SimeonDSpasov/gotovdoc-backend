@@ -5,6 +5,7 @@ import Config from './../config';
 
 export interface IOrder extends Document {
   orderId: string;
+  documentId?: mongoose.Types.ObjectId; // Reference to the Document collection
   userId?: mongoose.Types.ObjectId;
   items: Array<{
     id: string;
@@ -51,6 +52,12 @@ const OrderSchema: Schema = new Schema(
       type: String,
       required: true,
       unique: true,
+      index: true,
+    },
+    documentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Document',
+      required: false,
       index: true,
     },
     userId: {

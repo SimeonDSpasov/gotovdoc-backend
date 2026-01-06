@@ -124,6 +124,7 @@ export default class PaymentController {
       // Create order in database using data layer
       const order = await this.orderDataLayer.create({
         orderId,
+        documentId: document._id, // Link to the Document collection
         userId: userId || undefined,
         items: mappedItems,
         subtotal,
@@ -268,22 +269,26 @@ export default class PaymentController {
         logger.info(`Payment successful for order ${orderID}`);
 
         // Update the corresponding document
-        try {
-          await this.documentDataLayer.updateByFilter(
-            { 'data.orderId': orderID },
-            {
-              $set: {
-                'orderData.paid': true,
-                'orderData.paidAt': new Date(),
-                'orderData.paymentLinkId': transactionRef,
-                'orderData.amount': amount,
-                'orderData.currency': currency,
+        if (order.documentId) {
+          try {
+            await this.documentDataLayer.update(
+              order.documentId.toString(),
+              {
+                $set: {
+                  'orderData.paid': true,
+                  'orderData.paidAt': new Date(),
+                  'orderData.paymentLinkId': transactionRef,
+                  'orderData.amount': amount,
+                  'orderData.currency': currency,
+                },
               },
-            },
-            this.logContext
-          );
-        } catch (docError: any) {
-          logger.error(`Failed to update document: ${docError.message}`, this.logContext);
+              this.logContext
+            );
+          } catch (docError: any) {
+            logger.error(`Failed to update document: ${docError.message}`, this.logContext);
+          }
+        } else {
+          logger.error(`Order ${orderID} has no documentId`, this.logContext);
         }
 
         // TODO: Generate and send documents
@@ -297,19 +302,23 @@ export default class PaymentController {
         logger.info(`Payment failed for order ${orderID}. Method: ${webhookResult.method}`);
 
         // Update the corresponding document
-        try {
-          await this.documentDataLayer.updateByFilter(
-            { 'data.orderId': orderID },
-            {
-              $set: {
-                'orderData.paid': false,
-                'orderData.failedAt': new Date(),
+        if (order.documentId) {
+          try {
+            await this.documentDataLayer.update(
+              order.documentId.toString(),
+              {
+                $set: {
+                  'orderData.paid': false,
+                  'orderData.failedAt': new Date(),
+                },
               },
-            },
-            this.logContext
-          );
-        } catch (docError: any) {
-          logger.error(`Failed to update document: ${docError.message}`, this.logContext);
+              this.logContext
+            );
+          } catch (docError: any) {
+            logger.error(`Failed to update document: ${docError.message}`, this.logContext);
+          }
+        } else {
+          logger.error(`Order ${orderID} has no documentId`, this.logContext);
         }
       }
 
