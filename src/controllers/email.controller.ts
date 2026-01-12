@@ -1,16 +1,10 @@
 import { RequestHandler } from 'express';
-import bcryptjs from 'bcryptjs';
-import mongoose from 'mongoose';
 
-import CustomError from '../utils/custom-error.utils';
+import CustomError from './../utils/custom-error.utils';
 
-// import TokenUtil from './../utils/token.util';
+import { EmailType, EmailUtil } from './../utils/email.util';
 
-// import { EmailType, EmailUtil } from './../utils/email.util';
-
-import { EmailType, EmailUtil } from '../utils/email.util';
-
-import Config from '../config';
+import Config from './../config';
 
 export default class EmailController {
   

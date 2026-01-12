@@ -1,8 +1,8 @@
 import mongoose, { FilterQuery, UpdateQuery } from 'mongoose';
 
-import CustomError from '../utils/custom-error.utils';
+import CustomError from './../utils/custom-error.utils';
 
-import { Document, DocumentDoc, IDocument } from '../models/document.model';
+import { Document, DocumentDoc, IDocument } from './../models/document.model';
 
 export default class DocumentDataLayer {
 

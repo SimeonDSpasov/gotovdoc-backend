@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import logger from '@ipi-soft/logger';
-import Config from '../config';
+import Config from './../config';
 
 /**
  * Middleware to validate myPOS webhook requests

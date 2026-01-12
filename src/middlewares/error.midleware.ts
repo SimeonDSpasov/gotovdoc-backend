@@ -1,6 +1,6 @@
 import { ErrorRequestHandler } from 'express';
 
-import CustomError from '../utils/custom-error.utils';
+import CustomError from './../utils/custom-error.utils';
 
 export default class ErrorMiddleware {
 

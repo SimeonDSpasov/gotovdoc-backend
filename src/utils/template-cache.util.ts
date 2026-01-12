@@ -3,7 +3,7 @@ import path from 'path';
 
 import logger from '@ipi-soft/logger';
 
-import Config from '../config';
+import Config from './../config';
 import RedisUtil from './redis.util';
 
 const TEMPLATE_BASE_PATH = process.env.DOC_TEMPLATE_DIR
@@ -25,6 +25,7 @@ export default class TemplateCacheUtil {
 
   public static async getTemplate(templateName: string): Promise<Buffer> {
     const redisClient = RedisUtil.getClient();
+
     if (redisClient) {
       try {
         const redisBuffer = await redisClient.getBuffer(this.getRedisKey(templateName));
@@ -32,6 +33,7 @@ export default class TemplateCacheUtil {
         if (redisBuffer) {
           return redisBuffer;
         }
+  
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         logger.error(message, 'TemplateCache -> Redis get');

@@ -1,8 +1,8 @@
 import mongoose, { FilterQuery, UpdateQuery } from 'mongoose';
 
-import CustomError from '../utils/custom-error.utils';
+import CustomError from './../utils/custom-error.utils';
 
-import { User, UserDoc, IUser, UserRole } from '../models/user.model';
+import { User, UserDoc, IUser, UserRole } from './../models/user.model';
 
 export default class UserDataLayer {
 

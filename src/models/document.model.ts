@@ -2,12 +2,12 @@ import mongoose, { ObjectId, Schema, Types } from 'mongoose';
 
 import bcryptjs from 'bcryptjs';
 
-import ErrorUtil from '../utils/error.util';
-import Config from '../config';
-
+import ErrorUtil from './../utils/error.util';
+import Config from './../config';
 
 export enum DocumentType {
   Speciment,
+  PowerOfAttorney,
   Certificate,
   License,
   Passport,

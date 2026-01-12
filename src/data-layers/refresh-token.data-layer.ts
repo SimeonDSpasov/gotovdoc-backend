@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
-import CustomError from '../utils/custom-error.utils';
+import CustomError from './../utils/custom-error.utils';
 
-import { RefreshToken, RefreshTokenDoc, IRefreshToken } from '../models/refresh-token.model';
+import { RefreshToken, RefreshTokenDoc, IRefreshToken } from './../models/refresh-token.model';
 
 export default class RefreshTokenDataLayer {
 

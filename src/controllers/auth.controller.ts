@@ -1,17 +1,17 @@
-import { RequestHandler } from 'express';
 import bcryptjs from 'bcryptjs';
+import { RequestHandler } from 'express';
 import mongoose from 'mongoose';
 
-import CustomError from '../utils/custom-error.utils';
-import TokenUtil from '../utils/token.util';
-import { EmailType, EmailUtil } from '../utils/email.util';
+import CustomError from './../utils/custom-error.utils';
 
-import UserDataLayer from '../data-layers/user.data-layer';
+import { EmailType, EmailUtil } from './../utils/email.util';
+import TokenUtil from './../utils/token.util';
 
-import { IUser } from '../models/user.model';
+import UserDataLayer from './../data-layers/user.data-layer';
 
-import Config from '../config';
 import logger from '@ipi-soft/logger';
+import Config from './../config';
+import { IUser } from './../models/user.model';
 
 export default class AuthController {
   

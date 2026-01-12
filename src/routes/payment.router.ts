@@ -1,27 +1,30 @@
 import { Router } from 'express';
 
-import CatchUtil from '../utils/catch.util';
-import PaymentController from '../controllers/payment.controller';
-import { validateMyPosWebhook } from '../middlewares/mypos-webhook.middleware';
+import { validateMyPosWebhook } from './../middlewares/mypos-webhook.middleware';
+
+import CatchUtil from './../utils/catch.util';
+
+import PaymentController from './../controllers/payment.controller';
 
 const useCatch = CatchUtil.getUseCatch();
 const paymentController = new PaymentController();
 
-const paymentRouter = Router();
+const PaymentRouter = Router();
 
 // === CHECKOUT API (IPC v1.4) ===
 
 // Get available documents and packages with prices
-paymentRouter.get('/prices', useCatch(paymentController.getPrices));
+PaymentRouter.get('/prices', useCatch(paymentController.getPrices));
 
 // Create order and get signed payment parameters
-paymentRouter.post('/create-order', useCatch(paymentController.createOrder));
+PaymentRouter.post('/create-order', useCatch(paymentController.createOrder));
+
+// Get signed payment parameters for existing order
+PaymentRouter.get('/params/:orderId', useCatch(paymentController.getPaymentParams));
 
 // Handle myPOS IPC notification (IPCPurchaseNotify)
 // Apply security middleware before processing webhook
-paymentRouter.post('/notify', validateMyPosWebhook, useCatch(paymentController.handleIPCNotification));
+PaymentRouter.post('/notify', validateMyPosWebhook, useCatch(paymentController.handleIPCNotification));
 
-
-export default paymentRouter;
-
+export default PaymentRouter;
 

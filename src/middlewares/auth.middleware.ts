@@ -1,11 +1,11 @@
 import { RequestHandler, Request } from 'express';
 
-import TokenUtil from '../utils/token.util';
-import CustomError from '../utils/custom-error.utils';
+import TokenUtil from './../utils/token.util';
+import CustomError from './../utils/custom-error.utils';
 
-import UserDataLayer from '../data-layers/user.data-layer';
+import UserDataLayer from './../data-layers/user.data-layer';
 
-import { UserDoc, UserRole } from '../models/user.model';
+import { UserDoc, UserRole } from './../models/user.model';
 
 declare global {
   namespace Express {
@@ -23,11 +23,8 @@ export default class AuthMiddleware {
   private userDataLayer = UserDataLayer.getInstance();
 
   public isAuthenticated: RequestHandler = async (req, res, next) => {
+    console.log('here')
     const accessToken = this.getAccessTokenFromHeaders(req);
-
-    console.log(accessToken);
-    console.log(req.headers['authorization-access']);
-    console.log(req.query['authorization-access']);
 
     if (!accessToken) {
       return next(new CustomError(401, 'Unauthorized'));
@@ -54,7 +51,9 @@ export default class AuthMiddleware {
   public isAdmin: RequestHandler = (req, res, next) => {
     const user = req.user;
 
-    if (user.role !== UserRole.Admin) {
+    console.log(user.role)
+
+    if (user.role !== UserRole.Moderator) {
       next(new CustomError(403, 'Forbidden - Admin access required'));
 
       return;

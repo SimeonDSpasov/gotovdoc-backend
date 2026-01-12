@@ -6,7 +6,7 @@ import { IncomingMessage, ServerResponse } from 'http';
 
 import MainRouter from './routes/main.router';
 
-import ErrorMiddleware from './middlewares/error.middleware';
+import ErrorMiddleware from './middlewares/error.midleware';
 
 import Config from './config';
 
@@ -23,6 +23,7 @@ export default class AppServer {
 
     const allowedOrigins = [
       this.config.frontendUrl,
+      'http://gotovdoc.bg',
       ...(process.env.CORS_ADDITIONAL_ORIGINS ? process.env.CORS_ADDITIONAL_ORIGINS.split(',').map(origin => origin.trim()).filter(Boolean) : [])
     ];
 

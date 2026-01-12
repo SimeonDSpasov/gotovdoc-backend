@@ -6,7 +6,7 @@ import handlebars from 'handlebars';
 
 import ErrorUtil from './error.util';
 
-import Config from '../config';
+import Config from './../config';
 import CustomError from './custom-error.utils';
 
 export enum EmailType {

@@ -1,12 +1,19 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-import ConnectionManager from '../connection-manager';
+import ConnectionManager from './../connection-manager';
 import Config from './../config';
 
-export interface IOrder extends Document {
+export interface IOrder {
   orderId: string;
   documentId?: mongoose.Types.ObjectId; // Reference to the Document collection
   userId?: mongoose.Types.ObjectId;
+  userUploadedFiles?: Array<{
+    fileId: mongoose.Types.ObjectId;
+    filename: string;
+    mimetype: string;
+    size: number;
+    uploadedAt?: Date;
+  }>;
   items: Array<{
     id: string;
     type: 'document' | 'package';
@@ -39,11 +46,19 @@ export interface IOrder extends Document {
   };
   documentsGenerated: boolean;
   documentsSent: boolean;
+  deliveryMethod?: 'upload' | 'physical' | 'download';
+  files?: Array<{
+    filename: string;
+    originalName: string;
+    path: string;
+    size: number;
+    mimetype: string;
+    uploadedAt?: Date;
+  }>;
   createdAt: Date;
   updatedAt: Date;
   paidAt?: Date;
   failedAt?: Date;
-  expiresAt?: Date;
 }
 
 const OrderSchema: Schema = new Schema(
@@ -64,6 +79,17 @@ const OrderSchema: Schema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: false,
+    },
+    userUploadedFiles: {
+      type: [{
+        fileId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        filename: { type: String, required: true },
+        mimetype: { type: String, required: true },
+        size: { type: Number, required: true },
+        uploadedAt: { type: Date, default: () => new Date() },
+      }],
+      required: false,
+      default: [],
     },
     items: {
       type: [{
@@ -130,21 +156,31 @@ const OrderSchema: Schema = new Schema(
       type: Boolean,
       default: false,
     },
+    deliveryMethod: {
+      type: String,
+      enum: ['upload', 'physical', 'download'],
+      required: false
+    },
+    files: {
+      type: [{
+        filename: { type: String, required: true },
+        originalName: { type: String, required: true },
+        path: { type: String, required: true },
+        size: { type: Number, required: true },
+        mimetype: { type: String, required: true },
+        uploadedAt: { type: Date, default: () => new Date() },
+      }],
+      required: false,
+      default: [],
+    },
     paidAt: Date,
     failedAt: Date,
-    expiresAt: {
-      type: Date,
-      default: () => new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-    },
   },
   {
     timestamps: true,
     collection: 'orders',
   }
 );
-
-// Index for cleanup of expired orders
-OrderSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 // Index for user orders
 OrderSchema.index({ userId: 1, createdAt: -1 });
@@ -156,4 +192,3 @@ const Order = db.model<IOrder>('Order', OrderSchema);
 type OrderDoc = ReturnType<(typeof Order)['hydrate']>;
 
 export { Order, OrderDoc, OrderSchema };
-

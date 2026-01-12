@@ -7,13 +7,13 @@ import { pipeline } from 'stream/promises';
 import logger from '@ipi-soft/logger';
 // Footer disabled for performance testing
 // import PdfFooterUtil from '../utils/pdf-footer.util';
-import LibreOfficeConverter from '../utils/libreoffice-converter.util';
-import TemplateCacheUtil from '../utils/template-cache.util';
+import LibreOfficeConverter from './../utils/libreoffice-converter.util';
+import TemplateCacheUtil from './../utils/template-cache.util';
 
-import CustomError from '../utils/custom-error.utils';
-import DocumentDataLayer from '../data-layers/document.data-layer';
-import { DocumentType } from '../models/document.model';
-import MyPosService from '../services/mypos.service';
+import CustomError from './../utils/custom-error.utils';
+import DocumentDataLayer from './../data-layers/document.data-layer';
+import { DocumentType } from './../models/document.model';
+import MyPosService from './../services/mypos.service';
 
 export default class DocumentController {
   
@@ -34,6 +34,8 @@ export default class DocumentController {
     if (!three_names || !egn || !id_number || !id_year || !id_issuer || !company_name || !company_adress) {
       throw new CustomError(400, 'Missing fields: three_names | egn | id_number | id_year | id_issuer | company_name | company_adress');
     }
+
+    const logContext = `${this.logContext} -> generateSpeciment()`;
   
     const documentData = {
       three_names,
@@ -51,7 +53,7 @@ export default class DocumentController {
         type: DocumentType.Speciment,
         data: documentData,
       },
-      this.logContext
+      logContext
     );
 
     await Promise.allSettled([
@@ -67,7 +69,7 @@ export default class DocumentController {
     try {
       pdfStream = await LibreOfficeConverter.docxBufferToPdfStream(filledDocx);
     } catch (err) {
-      throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${this.logContext} -> convertToPdf`);
+      throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${logContext} -> convertToPdf`);
     }
 
     res.setHeader("Content-Type", "application/pdf");
@@ -79,8 +81,10 @@ export default class DocumentController {
   public downloadDocument: RequestHandler = async (req, res) => {
     const { orderId } = req.params;
 
+    const logContext = `${this.logContext} -> downloadDocument()`;
+
     // Verify payment was completed
-    const document = await this.documentDataLayer.getById(orderId, this.logContext);
+    const document = await this.documentDataLayer.getById(orderId, logContext);
 
     if (!(document.orderData as any)?.paid) {
       throw new CustomError(403, 'Payment required to download document');
@@ -98,7 +102,7 @@ export default class DocumentController {
     try {
       pdfStream = await LibreOfficeConverter.docxBufferToPdfStream(filledDocx);
     } catch (err) {
-      throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${this.logContext} -> convertToPdf`);
+      throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${logContext} -> convertToPdf`);
     }
 
     res.setHeader("Content-Type", "application/pdf");

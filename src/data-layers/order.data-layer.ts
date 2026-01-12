@@ -1,8 +1,8 @@
 import mongoose, { FilterQuery, UpdateQuery } from 'mongoose';
 
-import CustomError from '../utils/custom-error.utils';
+import CustomError from './../utils/custom-error.utils';
 
-import { Order, OrderDoc, IOrder } from '../models/order.model';
+import { Order, OrderDoc, IOrder } from './../models/order.model';
 
 export default class OrderDataLayer {
 

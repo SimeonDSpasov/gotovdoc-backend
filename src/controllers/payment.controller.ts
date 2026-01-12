@@ -1,19 +1,23 @@
-import { RequestHandler } from 'express';
-import logger from '@ipi-soft/logger';
 import crypto from 'crypto';
-
-import CustomError from '../utils/custom-error.utils';
-import MyPosService from '../services/mypos.service';
-import MyPosCheckoutService, { CartItem } from '../services/mypos-checkout.service';
-import { Document, DocumentType } from '../models/document.model';
-import DocumentDataLayer from '../data-layers/document.data-layer';
-import OrderDataLayer from '../data-layers/order.data-layer';
-import PriceValidationService from '../services/price-validation.service';
+import logger from '@ipi-soft/logger';
 import mongoose from 'mongoose';
-import Config from '../config';
+import { RequestHandler } from 'express';
+
+import CustomError from './../utils/custom-error.utils';
+
+import MyPosCheckoutService, { CartItem } from './../services/mypos-checkout.service';
+import MyPosService from './../services/mypos.service';
+import PriceValidationService from './../services/price-validation.service';
+
+import DocumentDataLayer from './../data-layers/document.data-layer';
+import OrderDataLayer from './../data-layers/order.data-layer';
+
+import { Document, DocumentType } from './../models/document.model';
+
+import Config from './../config';
 
 export default class PaymentController {
-  
+
   private logContext = 'Payment Controller';
   private myposService = MyPosService.getInstance();
   private myposCheckoutService = MyPosCheckoutService.getInstance();
@@ -27,6 +31,8 @@ export default class PaymentController {
    * GET /api/payment/prices
    */
   public getPrices: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> getPrices()`;
+
     try {
       const documents = this.priceValidationService.getAllDocumentPrices();
       const packages = this.priceValidationService.getAllPackagePrices();
@@ -38,8 +44,8 @@ export default class PaymentController {
         currency: 'EUR',
       });
     } catch (error: any) {
-      logger.error(`Failed to get prices: ${error.message}`, this.logContext);
-      throw new CustomError(500, 'Failed to retrieve prices');
+      logger.error(`Failed to get prices: ${error.message}`, logContext);
+      throw new CustomError(500, 'Failed to retrieve prices', logContext);
     }
   };
 
@@ -48,6 +54,8 @@ export default class PaymentController {
    * POST /api/payment/create-order
    */
   public createOrder: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> createOrder()`;
+
     try {
       const { items, userId } = req.body;
 
@@ -59,7 +67,7 @@ export default class PaymentController {
       const validation = this.priceValidationService.validateOrder(items);
 
       if (!validation.isValid) {
-        logger.error(`Price validation failed: ${validation.errors.join(', ')}`, this.logContext);
+        logger.error(`Price validation failed: ${validation.errors.join(', ')}`, logContext);
         throw new CustomError(400, `Invalid prices: ${validation.errors.join(', ')}`);
       }
 
@@ -72,7 +80,7 @@ export default class PaymentController {
       // IMPORTANT: Use backend prices, not frontend prices
       const mappedItems = items.map((item: any) => {
         const expectedPrice = this.priceValidationService.getItemPriceInfo(item.id, item.type).price || 0;
-        
+
         return {
           id: item.id || `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type: item.type || 'package',
@@ -119,7 +127,7 @@ export default class PaymentController {
           amount: total,
           currency: 'EUR',
         },
-      }, this.logContext);
+      }, logContext);
 
       // Create order in database using data layer
       const order = await this.orderDataLayer.create({
@@ -134,7 +142,7 @@ export default class PaymentController {
         currency: 'EUR',
         status: 'pending',
         customerData,
-      }, this.logContext);
+      }, logContext);
 
       // Prepare cart items for myPOS
       const cartItems: CartItem[] = mappedItems.map((item) => ({
@@ -160,7 +168,7 @@ export default class PaymentController {
       const backendUrl = this.config.env === 'prod'
         ? process.env.BACKEND_URL || 'https://gotovdoc-backend-production.up.railway.app'
         : 'https://gotovdoc-backend-production.up.railway.app'; // Test also uses Railway
-      
+
       const frontendUrl = this.config.env === 'prod'
         ? 'https://gotovdoc.bg'
         : 'https://gotovdoc.bg'; // Test also uses production frontend
@@ -194,7 +202,95 @@ export default class PaymentController {
         paymentParams,
       });
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> createOrder`);
+      logger.error(error.message, logContext);
+      throw error;
+    }
+  }
+
+  /**
+   * Get signed payment parameters for an existing order
+   * GET /api/payment/params/:orderId
+   */
+  public getPaymentParams: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> getPaymentParams()`;
+
+    try {
+      const { orderId } = req.params;
+
+      if (!orderId) {
+        throw new CustomError(400, 'Order ID is required');
+      }
+
+      // Find order in database
+      const order = await this.orderDataLayer.getByOrderId(orderId, logContext);
+
+      if (!order) {
+        throw new CustomError(404, 'Order not found');
+      }
+
+      // Check if order is already paid
+      if (order.status === 'paid') {
+        throw new CustomError(400, 'Order is already paid');
+      }
+
+      // Prepare cart items for myPOS
+      const cartItems: CartItem[] = order.items.map((item) => ({
+        article: item.name,
+        quantity: 1,
+        price: item.price,
+        amount: item.price,
+        currency: order.currency,
+      }));
+
+      // Add VAT as separate line item if applicable
+      if (order.vat > 0) {
+        cartItems.push({
+          article: `ДДС (${(order.vat / order.subtotal * 100).toFixed(0)}%)`,
+          quantity: 1,
+          price: order.vat,
+          amount: order.vat,
+          currency: order.currency,
+        });
+      }
+
+      // Determine backend and frontend URLs based on environment
+      const backendUrl = this.config.env === 'prod'
+        ? process.env.BACKEND_URL || 'https://gotovdoc-backend-production.up.railway.app'
+        : 'https://gotovdoc-backend-production.up.railway.app';
+
+      const frontendUrl = this.config.env === 'prod'
+        ? 'https://gotovdoc.bg'
+        : 'https://gotovdoc.bg';
+
+      const paymentParams = this.myposCheckoutService.createPurchaseParams({
+        Amount: order.total,
+        Currency: order.currency,
+        OrderID: order.orderId,
+        URL_OK: `${frontendUrl}/checkout/success?orderId=${order.orderId}`,
+        URL_Cancel: `${frontendUrl}/checkout/cancel`,
+        URL_Notify: `${backendUrl}/api/payment/notify`,
+        CustomerEmail: order.customerData.email || 'noemail@gotovdoc.bg',
+        CustomerFirstNames: order.customerData.firstName || 'Customer',
+        CustomerFamilyName: order.customerData.lastName || 'User',
+        CustomerPhone: order.customerData.phone,
+        CustomerIP: order.customerData.ip,
+        Note: `Order ${order.orderId}`,
+        CartItems: cartItems,
+      });
+
+      res.json({
+        success: true,
+        data: {
+          orderId: order.orderId,
+          amount: order.subtotal,
+          vat: order.vat,
+          total: order.total,
+          currency: order.currency,
+          paymentParams,
+        }
+      });
+    } catch (error: any) {
+      logger.error(error.message, logContext);
       throw error;
     }
   }
@@ -207,12 +303,14 @@ export default class PaymentController {
    * This controller focuses on business logic: processing payments and updating orders
    */
   public handleIPCNotification: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> handleIPCNotification()`;
+
     try {
       // Process and verify webhook (signature validation)
       const webhookResult = this.myposCheckoutService.processWebhookNotification(req.body);
 
       if (!webhookResult.isValid) {
-        logger.error('Invalid webhook signature', this.logContext);
+        logger.error('Invalid webhook signature', logContext);
         res.status(200).send('OK');
         return;
       }
@@ -220,19 +318,19 @@ export default class PaymentController {
       const { orderID, amount, currency, transactionRef, isSuccess } = webhookResult;
 
       if (!orderID) {
-        logger.error('No OrderID in webhook', this.logContext);
+        logger.error('No OrderID in webhook', logContext);
         res.status(200).send('OK');
         return;
       }
 
       // Find order in database
-      const order = await this.orderDataLayer.getByOrderId(orderID, this.logContext).catch((err) => {
-        logger.error(`Error fetching order: ${err.message}`, this.logContext);
+      const order = await this.orderDataLayer.getByOrderId(orderID, logContext).catch((err) => {
+        logger.error(`Error fetching order: ${err.message}`, logContext);
         return null;
       });
 
       if (!order) {
-        logger.error(`Order not found: ${orderID}`, this.logContext);
+        logger.error(`Order not found: ${orderID}`, logContext);
         res.status(200).send('OK');
         return;
       }
@@ -282,13 +380,13 @@ export default class PaymentController {
                   'orderData.currency': currency,
                 },
               },
-              this.logContext
+              logContext
             );
           } catch (docError: any) {
-            logger.error(`Failed to update document: ${docError.message}`, this.logContext);
+            logger.error(`Failed to update document: ${docError.message}`, logContext);
           }
         } else {
-          logger.error(`Order ${orderID} has no documentId`, this.logContext);
+          logger.error(`Order ${orderID} has no documentId`, logContext);
         }
 
         // TODO: Generate and send documents
@@ -312,19 +410,19 @@ export default class PaymentController {
                   'orderData.failedAt': new Date(),
                 },
               },
-              this.logContext
+              logContext
             );
           } catch (docError: any) {
-            logger.error(`Failed to update document: ${docError.message}`, this.logContext);
+            logger.error(`Failed to update document: ${docError.message}`, logContext);
           }
         } else {
-          logger.error(`Order ${orderID} has no documentId`, this.logContext);
+          logger.error(`Order ${orderID} has no documentId`, logContext);
         }
       }
 
       res.status(200).send('OK');
     } catch (error: any) {
-      logger.error(`Webhook error: ${error.message}`, this.logContext);
+      logger.error(`Webhook error: ${error.message}`, logContext);
       // Return OK to prevent retries
       res.status(200).send('OK');
     }
@@ -334,6 +432,8 @@ export default class PaymentController {
    * Handle old REST API webhook (for payment links/buttons)
    */
   public handleWebhook: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> handleWebhook()`;
+
     try {
       const webhookData = req.body;
 
@@ -363,7 +463,7 @@ export default class PaymentController {
 
       res.status(200).json({ received: true });
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> handleWebhook`);
+      logger.error(error.message, logContext);
       res.status(200).json({ received: true, error: 'Processing error' });
     }
   }
@@ -397,6 +497,8 @@ export default class PaymentController {
   }
 
   public createPaymentButton: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> createPaymentButton()`;
+
     try {
       logger.info('Creating payment button');
 
@@ -410,12 +512,14 @@ export default class PaymentController {
         data: paymentButton,
       });
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> createPaymentButton`);
+      logger.error(error.message, logContext);
       throw error;
     }
   }
 
   public createPaymentLink: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> createPaymentLink()`;
+
     try {
       const { amount, currency, order_id, customer_email, customer_name, note, success_url, cancel_url } = req.body;
 
@@ -471,12 +575,14 @@ export default class PaymentController {
         order_id,
       });
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> createPaymentLink`);
+      logger.error(error.message, logContext);
       throw error;
     }
   }
 
   public getAccounts: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> getAccounts()`;
+
     try {
       logger.info('Fetching accounts from myPOS');
 
@@ -490,12 +596,14 @@ export default class PaymentController {
         data: accountsData,
       });
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> getAccounts`);
+      logger.error(error.message, logContext);
       throw error;
     }
   }
 
   public getSettlementData: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> getSettlementData()`;
+
     try {
       logger.info('Fetching settlement data from myPOS');
 
@@ -509,7 +617,7 @@ export default class PaymentController {
         data: settlementData,
       });
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> getSettlementData`);
+      logger.error(error.message, logContext);
       throw error;
     }
   }
@@ -534,5 +642,3 @@ export default class PaymentController {
     );
   }
 }
-
-

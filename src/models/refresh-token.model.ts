@@ -1,6 +1,6 @@
 import mongoose, { Schema, Types } from 'mongoose';
 
-import Config from '../config';
+import Config from './../config';
 
 interface IRefreshToken {
   userId: Types.ObjectId;

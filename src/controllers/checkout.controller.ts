@@ -2,10 +2,10 @@ import { RequestHandler } from 'express';
 import logger from '@ipi-soft/logger';
 import mongoose from 'mongoose';
 
-import CustomError from '../utils/custom-error.utils';
-import MyPosCheckoutService from '../services/mypos-checkout.service';
-import { Document } from '../models/document.model';
-import Config from '../config';
+import CustomError from './../utils/custom-error.utils';
+import MyPosCheckoutService from './../services/mypos-checkout.service';
+import { Document } from './../models/document.model';
+import Config from './../config';
 
 /**
  * Controller for myPOS Checkout API v1.4
@@ -20,6 +20,8 @@ export default class CheckoutController {
    * Create a checkout session (returns form HTML or data for frontend to submit)
    */
   public createCheckout: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> createCheckout()`;
+
     try {
       const { 
         orderId, 
@@ -84,7 +86,7 @@ export default class CheckoutController {
         orderId,
       });
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> createCheckout`);
+      logger.error(error.message, logContext);
       throw error;
     }
   }
@@ -93,6 +95,8 @@ export default class CheckoutController {
    * Handle webhook notification from myPOS (IPCPurchaseNotify)
    */
   public handleWebhookNotify: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> handleWebhookNotify()`;
+
     try {
       const webhookData = req.body;
       logger.info(`Received webhook notification: ${JSON.stringify(webhookData)}`);
@@ -101,7 +105,7 @@ export default class CheckoutController {
       const result = this.checkoutService.processWebhookNotification(webhookData);
 
       if (!result.isValid) {
-        logger.error('Invalid webhook signature', this.logContext);
+        logger.error('Invalid webhook signature', logContext);
         res.status(400).send('Invalid signature');
         return;
       }
@@ -144,7 +148,7 @@ export default class CheckoutController {
       // Return OK response (myPOS expects this)
       res.status(200).send('OK');
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> handleWebhookNotify`);
+      logger.error(error.message, logContext);
       // Still return 200 to avoid webhook retry storms
       res.status(200).send('OK');
     }
@@ -154,6 +158,8 @@ export default class CheckoutController {
    * Get transaction status for an order
    */
   public getTransactionStatus: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> getTransactionStatus()`;
+
     try {
       const { orderId } = req.params;
 
@@ -173,7 +179,7 @@ export default class CheckoutController {
         data: status,
       });
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> getTransactionStatus`);
+      logger.error(error.message, logContext);
       throw error;
     }
   }
@@ -182,6 +188,8 @@ export default class CheckoutController {
    * Create a refund for a transaction
    */
   public createRefund: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> createRefund()`;
+
     try {
       const { orderId, transactionRef, amount, currency } = req.body;
 
@@ -229,7 +237,7 @@ export default class CheckoutController {
         data: refundResult,
       });
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> createRefund`);
+      logger.error(error.message, logContext);
       throw error;
     }
   }
@@ -239,6 +247,8 @@ export default class CheckoutController {
    * This should be removed or protected in production
    */
   public createTestPayment: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> createTestPayment()`;
+
     try {
       logger.info('Creating test payment form');
 
@@ -273,9 +283,8 @@ export default class CheckoutController {
       // Return HTML form that will auto-submit
       res.status(200).send(formHTML);
     } catch (error: any) {
-      logger.error(error.message, `${this.logContext} -> createTestPayment`);
+      logger.error(error.message, logContext);
       throw error;
     }
   }
 }
-

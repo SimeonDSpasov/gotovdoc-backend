@@ -3,9 +3,9 @@ import mongoose from 'mongoose';
 
 import CustomError from './custom-error.utils';
 
-import RefreshTokenDataLayer from '../data-layers/refresh-token.data-layer';
+import RefreshTokenDataLayer from './../data-layers/refresh-token.data-layer';
 
-import Config from '../config';
+import Config from './../config';
 
 export default class TokenUtil {
 

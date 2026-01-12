@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import logger from '@ipi-soft/logger';
 
-import Config from '../config';
+import Config from './../config';
 
 export default class RedisUtil {
 

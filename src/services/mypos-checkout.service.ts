@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import logger from '@ipi-soft/logger';
 
-import Config from '../config';
+import Config from './../config';
 
 /**
  * myPOS Checkout API v1.4 Service
