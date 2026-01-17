@@ -380,7 +380,6 @@ export default class MyPosCheckoutService {
       const dataWithoutSignature = { ...data };
       delete dataWithoutSignature.Signature;
 
-      console.log(dataWithoutSignature);
 
       // Concatenate all values with '-' separator (as shown in PHP example)
       const values = Object.values(dataWithoutSignature).map(v => String(v));

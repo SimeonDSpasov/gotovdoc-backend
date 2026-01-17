@@ -23,7 +23,6 @@ export default class AuthMiddleware {
   private userDataLayer = UserDataLayer.getInstance();
 
   public isAuthenticated: RequestHandler = async (req, res, next) => {
-    console.log('here')
     const accessToken = this.getAccessTokenFromHeaders(req);
 
     if (!accessToken) {
@@ -51,7 +50,6 @@ export default class AuthMiddleware {
   public isAdmin: RequestHandler = (req, res, next) => {
     const user = req.user;
 
-    console.log(user.role)
 
     if (user.role !== UserRole.Moderator) {
       next(new CustomError(403, 'Forbidden - Admin access required'));
@@ -102,4 +100,3 @@ export default class AuthMiddleware {
   }
 
 }
-

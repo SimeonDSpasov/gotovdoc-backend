@@ -28,7 +28,6 @@ export default class ConnectionManager extends EventEmitter {
 
     this.emit('connectionEstablished');
 
-    logger.info('DB Connection Established');
   }
 
   public getConnection(): mongoose.Connection {

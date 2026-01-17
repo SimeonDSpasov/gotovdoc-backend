@@ -124,7 +124,6 @@ export default class MyPosService {
       // Set expiry 5 minutes before actual expiry for safety
       this.tokenExpiry = Date.now() + (response.data.expires_in - 300) * 1000;
 
-      logger.info('MyPOS OAuth token generated successfully');
       return this.accessToken;
     } catch (error: any) {
       logger.error(error.message, 'MyPosService -> authenticate');
@@ -145,8 +144,6 @@ export default class MyPosService {
         throw new Error('MYPOS_CLIENT_ID is required');
       }
 
-      logger.info(`Creating payment button with request ID: ${requestId}`);
-      logger.info(`Request body: ${JSON.stringify(params)}`);
 
       // Use Transactions API v1.1
       const endpoint = 'https://transactions-api.mypos.com/v1.1/online-payments/button';
@@ -164,7 +161,6 @@ export default class MyPosService {
         }
       );
 
-      logger.info('Payment button created successfully');
       return response.data;
     } catch (error: any) {
       const errorMessage = error.response?.data 
@@ -212,8 +208,6 @@ export default class MyPosService {
         hide_quantity: true,
       };
 
-      logger.info(`Creating payment link with request ID: ${requestId}`);
-      logger.info(`Request body: ${JSON.stringify(requestBody)}`);
 
       // Use Transactions API v1.1
       const endpoint = 'https://transactions-api.mypos.com/v1.1/online-payments/link';
@@ -231,7 +225,6 @@ export default class MyPosService {
         }
       );
 
-      logger.info(`Payment link created: ${response.data.payment_url}`);
       return response.data;
     } catch (error: any) {
       const errorMessage = error.response?.data 
@@ -270,7 +263,6 @@ export default class MyPosService {
         throw new Error('MYPOS_CLIENT_ID is required');
       }
 
-      logger.info(`Fetching accounts with request ID: ${requestId}`);
 
       // Use Transactions API v1.1
       const endpoint = 'https://transactions-api.mypos.com/v1.1/accounts';
@@ -287,7 +279,6 @@ export default class MyPosService {
         }
       );
 
-      logger.info('Accounts retrieved successfully');
       return response.data;
     } catch (error: any) {
       const errorMessage = error.response?.data 
@@ -320,7 +311,6 @@ export default class MyPosService {
         throw new Error('MYPOS_CLIENT_ID is required');
       }
 
-      logger.info(`Fetching settlement data with request ID: ${requestId}`);
 
       // Use Transactions API v1.1
       const endpoint = 'https://transactions-api.mypos.com/v1.1/online-payments/settlement-data';
@@ -337,7 +327,6 @@ export default class MyPosService {
         }
       );
 
-      logger.info('Settlement data retrieved successfully');
       return response.data;
     } catch (error: any) {
       const errorMessage = error.response?.data 

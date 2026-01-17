@@ -47,7 +47,7 @@ export interface IOrder {
   documentsGenerated: boolean;
   documentsSent: boolean;
   deliveryMethod?: 'upload' | 'physical' | 'download';
-  files?: Array<{
+  finishedFiles?: Array<{
     filename: string;
     originalName: string;
     path: string;
@@ -161,7 +161,7 @@ const OrderSchema: Schema = new Schema(
       enum: ['upload', 'physical', 'download'],
       required: false
     },
-    files: {
+    finishedFiles: {
       type: [{
         filename: { type: String, required: true },
         originalName: { type: String, required: true },

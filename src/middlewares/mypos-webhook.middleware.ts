@@ -36,7 +36,6 @@ export const validateMyPosWebhook = (req: Request, res: Response, next: NextFunc
       }
     } else {
       // Log IP for monitoring (so you can whitelist it later)
-      logger.info(`Webhook received from IP: ${clientIP}`);
     }
 
     // Check 2: Validate body is not empty
