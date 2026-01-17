@@ -60,9 +60,6 @@ export default class AppServer {
       logger.info(`${workerId} Server Started - Listening on http://${this.config.server.hostname}:${this.config.server.port} (env: ${this.config.env})`);
 
       if (workerId === 'worker-1') {
-        console.log('===============================================');
-        console.log(this.config.mypos);
-        console.log('===============================================');
       }
     });
   }

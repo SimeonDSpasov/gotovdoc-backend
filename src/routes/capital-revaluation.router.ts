@@ -47,6 +47,18 @@ CapitalRevaluationRouter.post(
   useCatch(capitalRevaluationController.createOrder)
 );
 
+// Download all uploaded files for an order (zip, ordered)
+CapitalRevaluationRouter.get(
+  '/order/:orderId/uploads',
+  useCatch(capitalRevaluationController.downloadOrderFile)
+);
+
+// Download a single uploaded file for an order
+CapitalRevaluationRouter.get(
+  '/order/:orderId/uploads/:fileId',
+  useCatch(capitalRevaluationController.downloadOrderSingleFile)
+);
+
 // Download previously paid power of attorney
 CapitalRevaluationRouter.get(
   '/download/:orderId',

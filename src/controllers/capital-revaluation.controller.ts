@@ -1,10 +1,11 @@
 import { RequestHandler } from 'express';
 
+import fs from 'fs';
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
-import logger from '@ipi-soft/logger';
+import archiver from 'archiver';
 
 import CustomError from './../utils/custom-error.utils';
 import FileStorageUtil from './../utils/file-storage.util';
@@ -15,10 +16,6 @@ import DocumentDataLayer from './../data-layers/document.data-layer';
 import OrderDataLayer from './../data-layers/order.data-layer';
 
 import { DocumentType } from './../models/document.model';
-import { Order } from './../models/order.model';
-
-import Config from './../config';
-import fs from 'fs';
 
 export default class CapitalRevaluationController {
 
@@ -107,7 +104,6 @@ export default class CapitalRevaluationController {
       logContext
     );
 
-    logger.info(`Document saved to database for company ${companyEik}`, logContext);
 
     // Wait for template to be cached
     await CapitalRevaluationController.warmTemplate;
@@ -119,13 +115,11 @@ export default class CapitalRevaluationController {
 
     // Fill template with data
     const filledDocx = CapitalRevaluationController.renderTemplate(templateBuffer, documentData);
-    logger.info(`Template filled successfully`, logContext);
 
     // Convert to PDF
     let pdfStream: Readable;
     try {
       pdfStream = await LibreOfficeConverter.docxBufferToPdfStream(filledDocx);
-      logger.info(`DOCX converted to PDF successfully`, logContext);
     } catch (err) {
       throw new CustomError(
         500,
@@ -140,7 +134,6 @@ export default class CapitalRevaluationController {
 
     // Stream PDF to response
     await pipeline(pdfStream, res);
-    logger.info(`PDF streamed successfully for company ${companyEik}`, logContext);
   }
 
   /**
@@ -183,7 +176,6 @@ export default class CapitalRevaluationController {
       'town': storedData.city,
     };
 
-    logger.info(`Regenerating document for order ${orderId}, company ${storedData.companyEik}`, logContext);
 
     // Fill template with data
     const filledDocx = CapitalRevaluationController.renderTemplate(templateBuffer, documentData);
@@ -207,6 +199,7 @@ export default class CapitalRevaluationController {
     // Stream PDF to response
     await pipeline(pdfStream, res);
   }
+
 
   /**
    * Render docx template with data
@@ -240,6 +233,7 @@ export default class CapitalRevaluationController {
 
     // Upload files to GridFS
     const uploadedFiles = [];
+
     for (const file of files) {
       const fileStream = fs.createReadStream(file.path);
       const fileId = await this.fileStorageUtil.uploadFile(
@@ -307,6 +301,129 @@ export default class CapitalRevaluationController {
       success: true,
       data: order
     });
+  }
+
+  // Admin Download for requirement files/
+  public downloadOrderFile: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> downloadOrderFile`;
+
+    const id = req.body?.orderId || req.params?.orderId || req.query?.orderId;
+
+    if (!id) {
+      throw new CustomError(400, 'Order id is missing.');
+    }
+
+    const order = String(id).startsWith('ORD-')
+      ? await this.orderDataLayer.getByOrderId(String(id), logContext)
+      : await this.orderDataLayer.getById(String(id), logContext);
+
+    const orderObj = order.toObject();
+    const files = CapitalRevaluationController.collectUploadedFiles(orderObj);
+
+    if (files.length === 0) {
+      throw new CustomError(404, 'No files found for this order.');
+    }
+
+    const orderedFiles = files
+      .map((file, index) => ({ ...file, orderIndex: index }))
+      .sort((a, b) => {
+        if (a.uploadedAt && b.uploadedAt) {
+          return new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime();
+        }
+        return a.orderIndex - b.orderIndex;
+      });
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const baseName = orderObj.orderId || orderObj._id?.toString?.() || 'order';
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${baseName}-uploads.zip"`);
+
+    archive.pipe(res);
+
+    for (const [index, file] of orderedFiles.entries()) {
+      if (!file?.fileId) {
+        continue;
+      }
+
+      const fileStream = await this.fileStorageUtil.downloadFile(String(file.fileId));
+      const safeName = file.filename || `file-${index + 1}`;
+      const numberedName = `${String(index + 1).padStart(2, '0')}-${safeName}`;
+
+      archive.append(fileStream, { name: numberedName });
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      archive.on('error', reject);
+      res.on('finish', resolve);
+      archive.finalize();
+    });
+  }
+
+  public downloadOrderSingleFile: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> downloadOrderSingleFile`;
+
+    const id = req.params?.orderId || req.body?.orderId || req.query?.orderId;
+    const fileId = req.params?.fileId || req.body?.fileId || req.query?.fileId;
+
+    if (!id) {
+      throw new CustomError(400, 'Order id is missing.');
+    }
+
+    if (!fileId) {
+      throw new CustomError(400, 'File id is missing.');
+    }
+
+    const order = String(id).startsWith('ORD-')
+      ? await this.orderDataLayer.getByOrderId(String(id), logContext)
+      : await this.orderDataLayer.getById(String(id), logContext);
+
+    const orderObj = order.toObject();
+    const files = CapitalRevaluationController.collectUploadedFiles(orderObj);
+    const target = files.find((file) => String(file?.fileId) === String(fileId));
+
+    if (!target) {
+      throw new CustomError(404, 'File not found for this order.');
+    }
+
+    const fileStream = await this.fileStorageUtil.downloadFile(String(target.fileId));
+
+    res.setHeader('Content-Type', target.mimetype || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${target.filename || 'download'}"`);
+
+    await pipeline(fileStream, res);
+  }
+
+  private static collectUploadedFiles(order: any): Array<{
+    fileId: string;
+    filename?: string;
+    mimetype?: string;
+    size?: number;
+    uploadedAt?: Date;
+  }> {
+    const uploads: Array<any> = [];
+
+    if (Array.isArray(order?.userUploadedFiles)) {
+      order.userUploadedFiles.forEach((file: any) => uploads.push(file));
+    }
+
+    const items = Array.isArray(order?.items) ? order.items : [];
+    items.forEach((item: any) => {
+      const itemUploads = item?.formData?.uploadedFiles;
+      if (Array.isArray(itemUploads)) {
+        itemUploads.forEach((file: any) => uploads.push(file));
+      }
+    });
+
+    const uniqueById = new Map<string, any>();
+    uploads.forEach((file) => {
+      const fileId = file?.fileId?.toString ? file.fileId.toString() : String(file.fileId);
+      if (fileId && !uniqueById.has(fileId)) {
+        uniqueById.set(fileId, file);
+      }
+    });
+
+    return Array.from(uniqueById.values());
   }
 
   private static renderTemplate(templateBuffer: Buffer, data: Record<string, unknown>): Buffer {

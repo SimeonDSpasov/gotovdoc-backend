@@ -189,9 +189,6 @@ export default class PaymentController {
         CartItems: cartItems,
       });
 
-      console.log('===============================================');
-      console.log('paymentParams', paymentParams);
-      console.log('===============================================');
 
       res.json({
         orderId,
@@ -364,7 +361,6 @@ export default class PaymentController {
         };
 
         await order.save();
-        logger.info(`Payment successful for order ${orderID}`);
 
         // Update the corresponding document
         if (order.documentId) {
@@ -397,7 +393,6 @@ export default class PaymentController {
         order.status = 'failed';
         order.failedAt = new Date();
         await order.save();
-        logger.info(`Payment failed for order ${orderID}. Method: ${webhookResult.method}`);
 
         // Update the corresponding document
         if (order.documentId) {
@@ -437,7 +432,6 @@ export default class PaymentController {
     try {
       const webhookData = req.body;
 
-      logger.info(`Received REST API webhook: ${JSON.stringify(webhookData)}`);
 
       const { event_type, payment_link_id, order_id, status, amount, currency } = webhookData;
 
@@ -450,7 +444,6 @@ export default class PaymentController {
           currency,
         });
 
-        logger.info(`Payment completed for order: ${order_id}`);
       } else if (event_type === 'payment.failed' || status === 'failed') {
         await this.updateDocumentPaymentStatus(order_id, {
           paid: false,
@@ -458,7 +451,6 @@ export default class PaymentController {
           failedAt: new Date(),
         });
 
-        logger.info(`Payment failed for order: ${order_id}`);
       }
 
       res.status(200).json({ received: true });
@@ -500,12 +492,10 @@ export default class PaymentController {
     const logContext = `${this.logContext} -> createPaymentButton()`;
 
     try {
-      logger.info('Creating payment button');
 
       // Create payment button via myPOS service
       const paymentButton = await this.myposService.createPaymentButton(req.body);
 
-      logger.info('Payment button created successfully');
 
       res.json({
         success: true,
@@ -539,7 +529,6 @@ export default class PaymentController {
         throw new CustomError(404, 'Order not found');
       }
 
-      logger.info(`Creating payment link for order: ${order_id}`);
 
       // Create payment link via myPOS service
       const paymentLink = await this.myposService.createPaymentLink({
@@ -565,7 +554,6 @@ export default class PaymentController {
         }
       );
 
-      logger.info(`Payment link created for order: ${order_id}`);
 
       res.json({
         success: true,
@@ -584,12 +572,10 @@ export default class PaymentController {
     const logContext = `${this.logContext} -> getAccounts()`;
 
     try {
-      logger.info('Fetching accounts from myPOS');
 
       // Get accounts from myPOS
       const accountsData = await this.myposService.getAccounts();
 
-      logger.info('Accounts retrieved successfully');
 
       res.json({
         success: true,
@@ -605,12 +591,10 @@ export default class PaymentController {
     const logContext = `${this.logContext} -> getSettlementData()`;
 
     try {
-      logger.info('Fetching settlement data from myPOS');
 
       // Get settlement data from myPOS
       const settlementData = await this.myposService.getSettlementData();
 
-      logger.info('Settlement data retrieved successfully');
 
       res.json({
         success: true,

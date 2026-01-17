@@ -12,6 +12,7 @@
     "dev:worker-small": "WORKER_ID=worker-small PREFER_LARGE_ORDERS=false tsx watch --clear-screen=false src/worker.ts"
   },
   "devDependencies": {
+    "@types/archiver": "^7.0.0",
     "@types/cors": "^2.8.19",
     "@types/cron": "^2.0.1",
     "@types/express": "5.0.1",
