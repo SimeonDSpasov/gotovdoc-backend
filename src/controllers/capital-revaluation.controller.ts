@@ -363,8 +363,8 @@ export default class CapitalRevaluationController {
   public downloadOrderSingleFile: RequestHandler = async (req, res) => {
     const logContext = `${this.logContext} -> downloadOrderSingleFile`;
 
-    const id = req.params?.orderId || req.body?.orderId || req.query?.orderId;
-    const fileId = req.params?.fileId || req.body?.fileId || req.query?.fileId;
+    const id = req.body?.orderId;
+    const fileId = req.body?.fileId;
 
     if (!id) {
       throw new CustomError(400, 'Order id is missing.');
@@ -377,6 +377,7 @@ export default class CapitalRevaluationController {
     const order = String(id).startsWith('ORD-')
       ? await this.orderDataLayer.getByOrderId(String(id), logContext)
       : await this.orderDataLayer.getById(String(id), logContext);
+      
 
     const orderObj = order.toObject();
     const files = CapitalRevaluationController.collectUploadedFiles(orderObj);

@@ -100,25 +100,19 @@ export default class AuthController {
 
     const user = await this.userDataLayer.create(createUser, logContext);
 
+    const emailData = {
+      toEmail: user.email,
+      subject: 'Welcome to GotovDoc',
+      template: 'welcome',
+      payload: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+    };
 
-    // Send welcome email (optional)
-    try {
-      const emailData = {
-        toEmail: user.email,
-        subject: 'Welcome to GotovDoc',
-        template: 'welcome',
-        payload: {
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-        },
-      };
-
-      await this.emailUtil.sendEmail(emailData, EmailType.Info, logContext);
-    } catch (error: any) {
-      // Don't fail registration if email fails
-      logger.error(`Failed to send welcome email: ${error.message}`, logContext);
-    }
+    this.emailUtil.sendEmail(emailData, EmailType.Info, logContext)
+      .catch((err: any) => logger.error(`Failed to send welcome email: ${err.message}`, logContext));
 
     res.status(200).json();
   }
@@ -145,23 +139,20 @@ export default class AuthController {
     await this.userDataLayer.updatePassword(user, newPassword, logContext);
 
 
-    // Send password change notification email (optional)
-    try {
-      const emailData = {
-        toEmail: user.email,
-        subject: 'GotovDoc Password Changed',
-        template: 'change-password',
-        payload: {
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-        },
-      };
+    // Send password change notification email (fire and forget)
+    const emailData = {
+      toEmail: user.email,
+      subject: 'GotovDoc Password Changed',
+      template: 'change-password',
+      payload: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+    };
 
-      await this.emailUtil.sendEmail(emailData, EmailType.Info, logContext);
-    } catch (error: any) {
-      logger.error(`Failed to send password change email: ${error.message}`, logContext);
-    }
+    this.emailUtil.sendEmail(emailData, EmailType.Info, logContext)
+      .catch((err: any) => logger.error(`Failed to send password change email: ${err.message}`, logContext));
 
     res.status(200).json();
   }
@@ -195,7 +186,8 @@ export default class AuthController {
       },
     };
 
-    await this.emailUtil.sendEmail(emailData, EmailType.Info, logContext);
+    this.emailUtil.sendEmail(emailData, EmailType.Info, logContext)
+      .catch((err: any) => logger.error(`Failed to send password reset request email: ${err.message}`, logContext));
 
     res.status(200).json();
   }
@@ -228,23 +220,20 @@ export default class AuthController {
     await this.userDataLayer.updatePassword(user, password, logContext);
 
 
-    // Send password reset confirmation email (optional)
-    try {
-      const emailData = {
-        toEmail: user.email,
-        subject: 'GotovDoc Password Reset Successful',
-        template: 'reset-password-success',
-        payload: {
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-        },
-      };
+    // Send password reset confirmation email (fire and forget)
+    const resetEmailData = {
+      toEmail: user.email,
+      subject: 'GotovDoc Password Reset Successful',
+      template: 'reset-password-success',
+      payload: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+    };
 
-      await this.emailUtil.sendEmail(emailData, EmailType.Info, logContext);
-    } catch (error: any) {
-      logger.error(`Failed to send password reset success email: ${error.message}`, logContext);
-    }
+    this.emailUtil.sendEmail(resetEmailData, EmailType.Info, logContext)
+      .catch((err: any) => logger.error(`Failed to send password reset success email: ${err.message}`, logContext));
 
     res.status(200).json();
   }

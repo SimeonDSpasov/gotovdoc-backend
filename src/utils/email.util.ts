@@ -19,6 +19,11 @@ interface EmailData {
   subject: string;
   template: string;
   payload: any;
+  attachments?: Array<{
+    filename: string;
+    content: Buffer;
+    contentType?: string;
+  }>;
 }
 
 export class EmailUtil {
@@ -29,8 +34,9 @@ export class EmailUtil {
 
   private transporter = nodemailer.createTransport({
     host: 'iron.superhosting.bg',
-    port: 465, // SSL/TLS
-    secure: true, // true за порт 465
+    port: 587,
+    secure: false,
+    requireTLS: true,
     auth: {
       user: 'info@gotovdoc.bg',
       pass: this.config.emailPassword, // паролата от cPanel
@@ -39,6 +45,8 @@ export class EmailUtil {
 
   public async sendEmail(data: EmailData, type: EmailType, logContext: string): Promise<void> {
 
+    console.log('sending email to:', data.toEmail);
+    
     const accountEmail = type === EmailType.Info ? this.config.infoAccountEmail : this.config.supportAccountEmail;
 
     logContext = `${this.logContext} -> ${logContext}`;
@@ -58,12 +66,18 @@ export class EmailUtil {
       to: data.toEmail,
       subject: data.subject,
       html: compiledTemplate(data.payload),
+      attachments: data.attachments,
     }).catch((err: Error) => {
       throw new CustomError(500, err.message, `${logContext}`, false);
     });
   }
 
   private static instance: EmailUtil;
+
+  public async verify(): Promise<void> {
+    const response = await this.transporter.verify();
+    console.log('email verification response:', response);
+  }
 
   public static getInstance(): EmailUtil {
     if (!EmailUtil.instance) {

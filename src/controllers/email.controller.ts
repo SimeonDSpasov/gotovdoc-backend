@@ -35,7 +35,8 @@ export default class EmailController {
       },
     };
 
-    await this.emailUtil.sendEmail(emailData, EmailType.Info, logContext);
+    this.emailUtil.sendEmail(emailData, EmailType.Info, logContext)
+      .catch((err: any) => logger.error(`Failed to send contact us email: ${err.message}`, logContext));
 
     res.status(200).json();
   }

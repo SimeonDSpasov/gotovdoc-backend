@@ -14,12 +14,14 @@ import CustomError from './../utils/custom-error.utils';
 import DocumentDataLayer from './../data-layers/document.data-layer';
 import { DocumentType } from './../models/document.model';
 import MyPosService from './../services/mypos.service';
+import { EmailType, EmailUtil } from './../utils/email.util';
 
 export default class DocumentController {
   
   private logContext = 'Document Controller';
   private documentDataLayer = DocumentDataLayer.getInstance();
   private myposService = MyPosService.getInstance();
+  private emailUtil = EmailUtil.getInstance();
 
   private static readonly templateName = 'speciment.docx';
   private static readonly warmTemplate = TemplateCacheUtil.preload(DocumentController.templateName).catch((err: unknown) => {
@@ -29,10 +31,10 @@ export default class DocumentController {
   private static readonly warmFooter = Promise.resolve();
 
   public generateSpeciment: RequestHandler = async (req, res) => {
-    const { three_names, egn, id_number, id_year, id_issuer, company_name, company_adress } = req.body;
+    const { three_names, egn, id_number, id_year, id_issuer, company_name, company_adress, email } = req.body;
 
-    if (!three_names || !egn || !id_number || !id_year || !id_issuer || !company_name || !company_adress) {
-      throw new CustomError(400, 'Missing fields: three_names | egn | id_number | id_year | id_issuer | company_name | company_adress');
+    if (!three_names || !egn || !id_number || !id_year || !id_issuer || !company_name || !company_adress || !email) {
+      throw new CustomError(400, 'Missing fields: three_names | egn | id_number | id_year | id_issuer | company_name | company_adress | email');
     }
 
     const logContext = `${this.logContext} -> generateSpeciment()`;
@@ -45,6 +47,7 @@ export default class DocumentController {
       id_issuer,
       company_name,
       company_adress,
+      email,
     };
 
     // Save document to database
@@ -72,10 +75,32 @@ export default class DocumentController {
       throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${logContext} -> convertToPdf`);
     }
 
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="document.pdf"`);
+    const pdfBuffer = await DocumentController.streamToBuffer(pdfStream);
 
-    await pipeline(pdfStream, res);
+    const emailData = {
+      toEmail: email,
+      subject: 'Вашият документ е генериран',
+      template: 'document-generated',
+      payload: {
+        fullName: three_names,
+        companyName: company_name,
+        documentName: 'Спесимент',
+      },
+      attachments: [
+        {
+          filename: 'specimen-document.pdf',
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    };
+
+    this.emailUtil.sendEmail(emailData, EmailType.Info, this.logContext)
+      .catch((err: any) => logger.error(`Failed to send document email: ${err.message}`, this.logContext));
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="specimen-document.pdf"`);
+    res.end(pdfBuffer);
   }
 
   public downloadDocument: RequestHandler = async (req, res) => {
@@ -105,10 +130,18 @@ export default class DocumentController {
       throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${logContext} -> convertToPdf`);
     }
 
+    const recipientEmail = document.data?.email;
+
+    if (!recipientEmail) {
+      throw new CustomError(400, 'Email is missing for this document');
+    }
+
+    const pdfBuffer = await DocumentController.streamToBuffer(pdfStream);
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="specimen-document.pdf"`);
 
-    await pipeline(pdfStream, res);
+    res.end(pdfBuffer);
   }
 
   private static renderTemplate(templateBuffer: Buffer, data: Record<string, unknown>): Buffer {
@@ -116,5 +149,16 @@ export default class DocumentController {
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
     doc.render(data);
     return doc.getZip().generate({ type: "nodebuffer" });
+  }
+
+  private static streamToBuffer(stream: Readable): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+      stream.on('error', reject);
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+    });
   }
 }
