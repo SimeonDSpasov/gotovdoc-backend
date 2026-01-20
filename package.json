@@ -9,7 +9,8 @@
     "test": "jest",
     "dev:app": "tsx watch --clear-screen=false src/app.ts",
     "dev:worker-big": "WORKER_ID=worker-big PREFER_LARGE_ORDERS=true tsx watch --clear-screen=false src/worker.ts",
-    "dev:worker-small": "WORKER_ID=worker-small PREFER_LARGE_ORDERS=false tsx watch --clear-screen=false src/worker.ts"
+    "dev:worker-small": "WORKER_ID=worker-small PREFER_LARGE_ORDERS=false tsx watch --clear-screen=false src/worker.ts",
+    "send:sample-emails": "ts-node-dev --transpile-only scripts/send-sample-emails.ts"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",

@@ -7,6 +7,8 @@ import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import archiver from 'archiver';
 
+import logger from '@ipi-soft/logger';
+
 import CustomError from './../utils/custom-error.utils';
 import FileStorageUtil from './../utils/file-storage.util';
 import LibreOfficeConverter from './../utils/libreoffice-converter.util';
@@ -16,6 +18,8 @@ import DocumentDataLayer from './../data-layers/document.data-layer';
 import OrderDataLayer from './../data-layers/order.data-layer';
 
 import { DocumentType } from './../models/document.model';
+import { EmailType, EmailUtil } from './../utils/email.util';
+import Config from './../config';
 
 export default class CapitalRevaluationController {
 
@@ -24,6 +28,8 @@ export default class CapitalRevaluationController {
   private documentDataLayer = DocumentDataLayer.getInstance();
   private orderDataLayer = OrderDataLayer.getInstance();
   private fileStorageUtil = FileStorageUtil.getInstance();
+  private emailUtil = EmailUtil.getInstance();
+  private config = Config.getInstance();
 
   private static readonly templateName = 'revaluation-pulnomoshtno.docx';
   private static readonly warmTemplate = TemplateCacheUtil.preload(
@@ -296,6 +302,44 @@ export default class CapitalRevaluationController {
       documentsSent: false,
       deliveryMethod: uploadedFiles.length > 0 ? 'upload' : 'physical'
     }, logContext);
+
+    const host = req.get('host');
+    const baseUrl = host ? `${req.protocol}://${host}` : '';
+    const hasUploads = uploadedFiles.length > 0;
+    const includeRegistrationLabel = includeRegistration === 'true' || includeRegistration === true ? 'Да' : 'Не';
+
+    const emailData = {
+      toEmail: this.config.infoAccountEmail,
+      subject: 'Нова поръчка: Преоценка на капитала',
+      template: 'new-order',
+      payload: {
+        orderId: order.orderId,
+        createdAt: new Date().toLocaleString('bg-BG'),
+        customerName: `${firstName} ${lastName}`,
+        customerEmail: email,
+        customerPhone: phone,
+        companyName,
+        companyEik,
+        notes: notes || '—',
+        includeRegistration: includeRegistrationLabel,
+        deliveryMethod: hasUploads ? 'Качени файлове' : 'Физическо предаване',
+        hasUploads,
+        downloadAllUrl: hasUploads && baseUrl
+          ? `${baseUrl}/api/capital-revaluation/order/${order.orderId}/uploads`
+          : '',
+        uploadedFiles: uploadedFiles.map((file) => ({
+          filename: file.filename,
+          size: file.size,
+          mimetype: file.mimetype,
+          downloadUrl: baseUrl
+            ? `${baseUrl}/api/capital-revaluation/order/${order.orderId}/uploads/${file.fileId}`
+            : '',
+        })),
+      },
+    };
+
+    this.emailUtil.sendEmail(emailData, EmailType.Info, logContext)
+      .catch((err: any) => logger.error(`Failed to send new order email: ${err.message}`, logContext));
 
     res.status(201).json({
       success: true,

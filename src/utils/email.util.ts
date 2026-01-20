@@ -31,6 +31,7 @@ export class EmailUtil {
   private logContext = 'Email Util';
 
   private config = Config.getInstance();
+  private static helpersRegistered = false;
 
   private transporter = nodemailer.createTransport({
     host: 'iron.superhosting.bg',
@@ -57,15 +58,27 @@ export class EmailUtil {
     const main = fs.readFileSync(path.join(templatesPath, 'main.handlebars'), 'utf8');
     const partial = fs.readFileSync(path.join(templatesPath, data.template + '.handlebars'), 'utf8');
 
+    if (!EmailUtil.helpersRegistered) {
+      handlebars.registerHelper('eq', (left: unknown, right: unknown) => left === right);
+      EmailUtil.helpersRegistered = true;
+    }
+
     handlebars.registerPartial('partial', partial);
 
     const compiledTemplate = handlebars.compile(main);
+    const payload = {
+      ...data.payload,
+      subject: data.subject,
+      currentYear: new Date().getFullYear(),
+      context: (data.payload as any)?.context ?? (data.payload as any)?.where,
+      errorMessage: (data.payload as any)?.errorMessage ?? (data.payload as any)?.message,
+    };
 
     await this.transporter.sendMail({
       from: `ГОТОВДОК ${accountEmail}`,
       to: data.toEmail,
       subject: data.subject,
-      html: compiledTemplate(data.payload),
+      html: compiledTemplate(payload),
       attachments: data.attachments,
     }).catch((err: Error) => {
       throw new CustomError(500, err.message, `${logContext}`, false);
