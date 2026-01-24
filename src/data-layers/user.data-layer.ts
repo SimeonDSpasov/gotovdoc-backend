@@ -2,7 +2,7 @@ import mongoose, { FilterQuery, UpdateQuery } from 'mongoose';
 
 import CustomError from './../utils/custom-error.utils';
 
-import { User, UserDoc, IUser, UserRole } from './../models/user.model';
+import { User, UserDoc, IUser, IUserActivity, UserRole } from './../models/user.model';
 
 export default class UserDataLayer {
 
@@ -115,6 +115,32 @@ export default class UserDataLayer {
       });
 
     return user;
+  }
+
+  public async appendActivity(
+    userId: string | mongoose.Types.ObjectId,
+    activity: IUserActivity,
+    logContext: string
+  ): Promise<void> {
+    logContext = `${logContext} -> ${this.logContext} -> appendActivity()`;
+
+    if (!mongoose.isValidObjectId(userId)) {
+      throw new CustomError(400, `Invalid user ID`);
+    }
+
+    await User.updateOne(
+      { _id: userId },
+      {
+        $push: {
+          activity: {
+            $each: [{ ...activity, createdAt: activity.createdAt || new Date() }],
+            $slice: -100,
+          }
+        }
+      }
+    ).catch(err => {
+      throw new CustomError(500, err.message, `${logContext} -> userId: ${userId.toString()} | activity: ${JSON.stringify(activity)}`);
+    });
   }
 
   private buildChunkSearchStage(searchTerm: string): any | null {

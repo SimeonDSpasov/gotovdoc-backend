@@ -61,6 +61,7 @@ export const VAT_RATE = 0.20;
  */
 export function getDocumentPrice(documentId: string): number | null {
   const price = DOCUMENT_PRICES[documentId as DocumentType];
+
   return price !== undefined ? price : null;
 }
 
@@ -69,6 +70,7 @@ export function getDocumentPrice(documentId: string): number | null {
  */
 export function getPackagePrice(packageId: string): number | null {
   const price = PACKAGE_PRICES[packageId as PackageType];
+
   return price !== undefined ? price : null;
 }
 
@@ -77,6 +79,7 @@ export function getPackagePrice(packageId: string): number | null {
  */
 export function getPackageDocuments(packageId: string): DocumentType[] | null {
   const documents = PACKAGE_DOCUMENTS[packageId as PackageType];
+
   return documents || null;
 }
 

@@ -16,6 +16,7 @@ import TemplateCacheUtil from './../utils/template-cache.util';
 
 import DocumentDataLayer from './../data-layers/document.data-layer';
 import OrderDataLayer from './../data-layers/order.data-layer';
+import UserDataLayer from './../data-layers/user.data-layer';
 
 import { DocumentType } from './../models/document.model';
 import { EmailType, EmailUtil } from './../utils/email.util';
@@ -27,6 +28,7 @@ export default class CapitalRevaluationController {
 
   private documentDataLayer = DocumentDataLayer.getInstance();
   private orderDataLayer = OrderDataLayer.getInstance();
+  private userDataLayer = UserDataLayer.getInstance();
   private fileStorageUtil = FileStorageUtil.getInstance();
   private emailUtil = EmailUtil.getInstance();
   private config = Config.getInstance();
@@ -93,7 +95,7 @@ export default class CapitalRevaluationController {
       'town': city,
     };
     // Save document to database
-    await this.documentDataLayer.create(
+    const document = await this.documentDataLayer.create(
       {
         type: DocumentType.PowerOfAttorney,
         data: {
@@ -106,9 +108,24 @@ export default class CapitalRevaluationController {
           city,
           date: currentDate,
         },
+        userId: req.user?._id as any,
       },
       logContext
     );
+    const activityUserId = req.user?._id;
+
+    if (activityUserId) {
+      this.userDataLayer.appendActivity(
+        activityUserId,
+        {
+          type: 'document_generated',
+          documentId: document._id,
+          documentName: 'Пълномощно',
+          createdAt: new Date(),
+        },
+        logContext
+      ).catch((err: any) => logger.error(`Failed to store activity: ${err.message}`, logContext));
+    }
 
 
     // Wait for template to be cached
@@ -153,8 +170,29 @@ export default class CapitalRevaluationController {
     // Verify payment was completed
     const document = await this.documentDataLayer.getById(orderId, logContext);
 
-    if (!(document.orderData as any)?.paid) {
+    if (!document.orderId) {
       throw new CustomError(403, 'Payment required to download document');
+    }
+
+    const order = await this.orderDataLayer.getById(document.orderId.toString(), logContext);
+
+    if (order.status !== 'paid' && order.status !== 'finished') {
+      throw new CustomError(403, 'Payment required to download document');
+    }
+
+    const activityUserId = order.userId || req.user?._id;
+
+    if (activityUserId) {
+      this.userDataLayer.appendActivity(
+        activityUserId,
+        {
+          type: 'document_downloaded',
+          documentId: document._id,
+          documentName: 'Пълномощно',
+          createdAt: new Date(),
+        },
+        logContext
+      ).catch((err: any) => logger.error(`Failed to store activity: ${err.message}`, logContext));
     }
 
     // Wait for template to be cached
@@ -271,6 +309,7 @@ export default class CapitalRevaluationController {
 
     const order = await this.orderDataLayer.create({
       orderId,
+      userId: req.user?._id,
       userUploadedFiles: uploadedFiles,
       subtotal: 0.5,
       vat: 0,

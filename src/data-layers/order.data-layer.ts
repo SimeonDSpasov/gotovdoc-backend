@@ -132,14 +132,14 @@ export default class OrderDataLayer {
 
   public async updateStatus(
     orderId: string,
-    status: 'pending' | 'paid' | 'failed' | 'processing' | 'fraud_attempt' | 'cancelled',
+    status: 'pending' | 'paid' | 'finished' | 'failed' | 'processing' | 'fraud_attempt' | 'cancelled',
     logContext: string
   ): Promise<OrderDoc> {
     logContext = `${logContext} -> ${this.logContext} -> updateStatus()`;
 
     const update: UpdateQuery<IOrder> = { status };
 
-    if (status === 'paid') {
+    if (status === 'paid' || status === 'finished') {
       update.paidAt = new Date();
     } else if (status === 'failed' || status === 'cancelled') {
       update.failedAt = new Date();
@@ -159,4 +159,3 @@ export default class OrderDataLayer {
   }
 
 }
-

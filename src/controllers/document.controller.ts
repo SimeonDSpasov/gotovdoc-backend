@@ -13,15 +13,18 @@ import TemplateCacheUtil from './../utils/template-cache.util';
 import CustomError from './../utils/custom-error.utils';
 import DocumentDataLayer from './../data-layers/document.data-layer';
 import { DocumentType } from './../models/document.model';
-import MyPosService from './../services/mypos.service';
+import UserDataLayer from './../data-layers/user.data-layer';
+import OrderDataLayer from './../data-layers/order.data-layer';
 import { EmailType, EmailUtil } from './../utils/email.util';
+import mongoose from 'mongoose';
 
 export default class DocumentController {
   
   private logContext = 'Document Controller';
   private documentDataLayer = DocumentDataLayer.getInstance();
-  private myposService = MyPosService.getInstance();
   private emailUtil = EmailUtil.getInstance();
+  private userDataLayer = UserDataLayer.getInstance();
+  private orderDataLayer = OrderDataLayer.getInstance();
 
   private static readonly templateName = 'speciment.docx';
   private static readonly warmTemplate = TemplateCacheUtil.preload(DocumentController.templateName).catch((err: unknown) => {
@@ -51,13 +54,70 @@ export default class DocumentController {
     };
 
     // Save document to database
-    await this.documentDataLayer.create(
+    const document = await this.documentDataLayer.create(
       {
         type: DocumentType.Speciment,
         data: documentData,
+        userId: req.user?._id as any,
       },
       logContext
     );
+    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const order = await this.orderDataLayer.create(
+      {
+        orderId,
+        documentId: document._id,
+        userId: req.user?._id,
+        items: [
+          {
+            id: 'speciment',
+            type: 'document',
+            name: 'Спесимент',
+            description: 'Спесимент документ',
+            price: 0,
+            formData: documentData,
+          },
+        ],
+        subtotal: 0,
+        vat: 0,
+        total: 0,
+        expectedAmount: 0,
+        currency: 'EUR',
+        status: 'finished',
+        customerData: {
+          email,
+          firstName: req.user?.firstName,
+          lastName: req.user?.lastName,
+          ip: req.ip || req.connection.remoteAddress,
+        },
+        documentsGenerated: true,
+        documentsSent: false,
+      },
+      logContext
+    );
+
+    await this.documentDataLayer.update(
+      document._id,
+      {
+        orderId: order._id,
+        userId: req.user?._id,
+      },
+      logContext
+    );
+    const activityUserId = req.user?._id;
+
+    if (activityUserId) {
+      this.userDataLayer.appendActivity(
+        activityUserId,
+        {
+          type: 'document_generated',
+          documentId: document._id,
+          documentName: 'Спесимент',
+          createdAt: new Date(),
+        },
+        logContext
+      ).catch((err: any) => logger.error(`Failed to store activity: ${err.message}`, logContext));
+    }
 
     await Promise.allSettled([
       DocumentController.warmTemplate,
@@ -110,8 +170,13 @@ export default class DocumentController {
 
     // Verify payment was completed
     const document = await this.documentDataLayer.getById(orderId, logContext);
+    if (!document.orderId) {
+      throw new CustomError(403, 'Payment required to download document');
+    }
 
-    if (!(document.orderData as any)?.paid) {
+    const order = await this.orderDataLayer.getById(document.orderId.toString(), logContext);
+
+    if (order.status !== 'paid' && order.status !== 'finished') {
       throw new CustomError(403, 'Payment required to download document');
     }
 
@@ -137,6 +202,24 @@ export default class DocumentController {
     }
 
     const pdfBuffer = await DocumentController.streamToBuffer(pdfStream);
+
+    const activityUserId = order.userId || req.user?._id;
+
+    if (activityUserId) {
+      const documentName = document.type === DocumentType.Speciment ? 'Спесимент' : 'Документ';
+
+      this.userDataLayer.appendActivity(
+        activityUserId,
+        {
+          type: 'document_downloaded',
+          documentId: document._id,
+          orderId: (document.data as any)?.orderId,
+          documentName,
+          createdAt: new Date(),
+        },
+        logContext
+      ).catch((err: any) => logger.error(`Failed to store activity: ${err.message}`, logContext));
+    }
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="specimen-document.pdf"`);

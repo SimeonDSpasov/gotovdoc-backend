@@ -4,7 +4,9 @@ import mongoose from 'mongoose';
 
 import CustomError from './../utils/custom-error.utils';
 import MyPosCheckoutService from './../services/mypos-checkout.service';
-import { Document } from './../models/document.model';
+import DocumentDataLayer from './../data-layers/document.data-layer';
+import OrderDataLayer from './../data-layers/order.data-layer';
+import { DocumentType } from './../models/document.model';
 import Config from './../config';
 
 /**
@@ -15,6 +17,8 @@ export default class CheckoutController {
   private logContext = 'Checkout Controller';
   private checkoutService = MyPosCheckoutService.getInstance();
   private config = Config.getInstance();
+  private documentDataLayer = DocumentDataLayer.getInstance();
+  private orderDataLayer = OrderDataLayer.getInstance();
 
   /**
    * Create a checkout session (returns form HTML or data for frontend to submit)
@@ -39,15 +43,7 @@ export default class CheckoutController {
         throw new CustomError(400, 'Missing required fields: orderId, amount, currency');
       }
 
-      // Validate order exists
-      if (!mongoose.isValidObjectId(orderId)) {
-        throw new CustomError(400, 'Invalid orderId format');
-      }
-
-      const document = await Document.findById(orderId);
-      if (!document) {
-        throw new CustomError(404, 'Order not found');
-      }
+      const order = await this.resolveOrder(orderId, logContext);
 
       // Convert amount to minor units (cents)
       const amountInCents = Math.round(amount * 100);
@@ -57,9 +53,9 @@ export default class CheckoutController {
       const formHTML = this.checkoutService.buildPurchaseForm({
         Amount: amountInCents,
         Currency: currency,
-        OrderID: orderId,
-        URL_OK: `${this.config.mypos.successUrl}?orderId=${orderId}`,
-        URL_Cancel: `${this.config.mypos.cancelUrl}?orderId=${orderId}`,
+        OrderID: order.orderId,
+        URL_OK: `${this.config.mypos.successUrl}?orderId=${order.orderId}`,
+        URL_Cancel: `${this.config.mypos.cancelUrl}?orderId=${order.orderId}`,
         URL_Notify: `${this.config.frontendUrl}/api/checkout/webhook/notify`,
         CustomerEmail: customerEmail || 'noemail@gotovdoc.bg',
         CustomerFirstNames: customerFirstName || 'Customer', // Note: plural "Names"
@@ -68,13 +64,13 @@ export default class CheckoutController {
         Note: note || 'Document payment',
       });
 
-      // Update document with checkout initiated
-      await Document.findByIdAndUpdate(orderId, {
+      // Update order with checkout initiated
+      await this.orderDataLayer.update(order._id, {
         $set: {
-          'orderData.amount': amount,
-          'orderData.currency': currency,
+          paidAmount: amount,
+          currency,
         },
-      });
+      }, logContext);
 
 
       // Return form HTML for frontend to render and auto-submit
@@ -111,17 +107,19 @@ export default class CheckoutController {
       if (result.isSuccess) {
         const orderId = result.orderID;
 
-        if (orderId && mongoose.isValidObjectId(orderId)) {
-          await Document.findByIdAndUpdate(orderId, {
+        if (orderId) {
+          const order = await this.resolveOrder(orderId, logContext);
+          await this.orderDataLayer.update(order._id, {
             $set: {
-              'orderData.paid': true,
-              'orderData.paidAt': new Date(),
-              'orderData.paymentLinkId': result.transactionRef,
-              'orderData.amount': result.amount,
-              'orderData.currency': result.currency,
+              status: 'paid',
+              paidAt: new Date(),
+              paidAmount: result.amount,
+              currency: result.currency,
+              paymentData: {
+                transactionRef: result.transactionRef,
+              },
             },
-          });
-
+          }, logContext);
         }
       }
 
@@ -129,14 +127,14 @@ export default class CheckoutController {
       if (!result.isSuccess) {
         const orderId = result.orderID;
 
-        if (orderId && mongoose.isValidObjectId(orderId)) {
-          await Document.findByIdAndUpdate(orderId, {
+        if (orderId) {
+          const order = await this.resolveOrder(orderId, logContext);
+          await this.orderDataLayer.update(order._id, {
             $set: {
-              'orderData.paid': false,
-              'orderData.failedAt': new Date(),
+              status: 'failed',
+              failedAt: new Date(),
             },
-          });
-
+          }, logContext);
         }
       }
 
@@ -158,13 +156,14 @@ export default class CheckoutController {
     try {
       const { orderId } = req.params;
 
-      if (!orderId || !mongoose.isValidObjectId(orderId)) {
+      if (!orderId) {
         throw new CustomError(400, 'Invalid orderId');
       }
 
+      const order = await this.resolveOrder(orderId, logContext);
 
       const status = await this.checkoutService.getTransactionStatus({
-        OrderID: orderId,
+        OrderID: order.orderId,
         OutputFormat: 'json',
       });
 
@@ -191,36 +190,29 @@ export default class CheckoutController {
         throw new CustomError(400, 'Missing required fields: orderId, transactionRef, amount, currency');
       }
 
-      if (!mongoose.isValidObjectId(orderId)) {
-        throw new CustomError(400, 'Invalid orderId format');
-      }
-
       // Verify order exists
-      const document = await Document.findById(orderId);
-      if (!document) {
-        throw new CustomError(404, 'Order not found');
-      }
+      const order = await this.resolveOrder(orderId, logContext);
 
       // Convert amount to minor units (cents)
       const amountInCents = Math.round(amount * 100);
 
 
       const refundResult = await this.checkoutService.createRefund({
-        OrderID: orderId,
+        OrderID: order.orderId,
         IPC_Trnref: transactionRef,
         Amount: amountInCents,
         Currency: currency,
         OutputFormat: 'json',
       });
 
-      // Update document with refund info
+      // Update order with refund info
       if (refundResult.Status === '0') {
-        await Document.findByIdAndUpdate(orderId, {
+        await this.orderDataLayer.update(order._id, {
           $set: {
-            'orderData.refunded': true,
-            'orderData.refundedAt': new Date(),
+            status: 'cancelled',
+            failedAt: new Date(),
           },
-        });
+        }, logContext);
       }
 
 
@@ -244,24 +236,47 @@ export default class CheckoutController {
     try {
 
       // Create a test document in the database
-      const testDocument = await Document.create({
-        type: 0, // DocumentType.Speciment
+      const testDocument = await this.documentDataLayer.create({
+        type: DocumentType.Speciment,
         data: { name: 'Test User', egn: '1234567890' },
-        orderData: {
+      }, logContext);
+
+      const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const testOrder = await this.orderDataLayer.create({
+        orderId,
+        documentId: testDocument._id,
+        items: [{
+          id: 'test-item',
+          type: 'document',
+          name: 'Test Document',
+          description: 'Test order',
+          price: 1.0,
+          formData: {},
+        }],
+        subtotal: 1.0,
+        vat: 0,
+        total: 1.0,
+        expectedAmount: 1.0,
+        currency: 'EUR',
+        status: 'pending',
+        customerData: {
           email: 'test@gotovdoc.bg',
-          cost: 1.0,
-          amount: 100, // 1.00 EUR in cents
-          currency: 'EUR',
+          firstName: 'Test',
+          lastName: 'User',
         },
-      });
+        documentsGenerated: false,
+        documentsSent: false,
+      }, logContext);
+
+      await this.documentDataLayer.update(testDocument._id, { orderId: testOrder._id }, logContext);
 
       // Generate checkout form HTML
       const formHTML = this.checkoutService.buildPurchaseForm({
         Amount: 100, // 1.00 EUR in cents
         Currency: 'EUR',
-        OrderID: testDocument._id.toString(),
-        URL_OK: `https://gotovdoc.bg/payment/success?orderId=${testDocument._id}`,
-        URL_Cancel: `https://gotovdoc.bg/payment/cancel?orderId=${testDocument._id}`,
+        OrderID: testOrder.orderId,
+        URL_OK: `https://gotovdoc.bg/payment/success?orderId=${testOrder.orderId}`,
+        URL_Cancel: `https://gotovdoc.bg/payment/cancel?orderId=${testOrder.orderId}`,
         URL_Notify: `https://gotovdoc-backend-production.up.railway.app/api/checkout/webhook/notify`,
         CustomerEmail: 'test@gotovdoc.bg',
         CustomerFirstNames: 'Иван', // Note: plural "Names"
@@ -276,5 +291,20 @@ export default class CheckoutController {
       logger.error(error.message, logContext);
       throw error;
     }
+  }
+
+  private async resolveOrder(orderId: string, logContext: string) {
+    if (mongoose.isValidObjectId(orderId)) {
+      try {
+        return await this.orderDataLayer.getById(orderId, logContext);
+      } catch (err) {
+        const document = await this.documentDataLayer.getById(orderId, logContext).catch(() => null);
+        if (document?.orderId) {
+          return await this.orderDataLayer.getById(document.orderId.toString(), logContext);
+        }
+      }
+    }
+
+    return await this.orderDataLayer.getByOrderId(orderId, logContext);
   }
 }

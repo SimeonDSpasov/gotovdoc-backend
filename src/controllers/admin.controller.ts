@@ -126,7 +126,7 @@ export default class AdminController {
             }
 
             // If marking as ready (documentsGenerated), update timestamp
-            if (update.status === 'paid' && !update.documentsGenerated) {
+            if ((update.status === 'paid' || update.status === 'finished') && !update.documentsGenerated) {
                 update.documentsGenerated = true;
             }
 
@@ -282,14 +282,14 @@ export default class AdminController {
             const stats = {
                 totalOrders: allOrders.length,
                 pendingOrders: allOrders.filter(o => o.status === 'pending').length,
-                paidOrders: allOrders.filter(o => o.status === 'paid').length,
+                paidOrders: allOrders.filter(o => o.status === 'paid' || o.status === 'finished').length,
                 failedOrders: allOrders.filter(o => o.status === 'failed').length,
                 processingOrders: allOrders.filter(o => o.status === 'processing').length,
                 totalRevenue: allOrders
-                    .filter(o => o.status === 'paid')
+                    .filter(o => o.status === 'paid' || o.status === 'finished')
                     .reduce((sum, o) => sum + (o.paidAmount || 0), 0),
                 ordersNeedingDocuments: allOrders.filter(
-                    o => o.status === 'paid' && !o.documentsGenerated
+                    o => (o.status === 'paid' || o.status === 'finished') && !o.documentsGenerated
                 ).length,
             };
 

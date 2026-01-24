@@ -1,12 +1,14 @@
 import { Router } from 'express';
 
 import { validateMyPosWebhook } from './../middlewares/mypos-webhook.middleware';
+import AuthMiddleware from './../middlewares/auth.middleware';
 
 import CatchUtil from './../utils/catch.util';
 
 import PaymentController from './../controllers/payment.controller';
 
 const useCatch = CatchUtil.getUseCatch();
+const authMiddleware = AuthMiddleware.getInstance();
 const paymentController = new PaymentController();
 
 const PaymentRouter = Router();
@@ -17,7 +19,11 @@ const PaymentRouter = Router();
 PaymentRouter.get('/prices', useCatch(paymentController.getPrices));
 
 // Create order and get signed payment parameters
-PaymentRouter.post('/create-order', useCatch(paymentController.createOrder));
+PaymentRouter.post(
+  '/create-order',
+  useCatch(authMiddleware.attachUserIfPresent),
+  useCatch(paymentController.createOrder)
+);
 
 // Get signed payment parameters for existing order
 PaymentRouter.get('/params/:orderId', useCatch(paymentController.getPaymentParams));
@@ -27,4 +33,3 @@ PaymentRouter.get('/params/:orderId', useCatch(paymentController.getPaymentParam
 PaymentRouter.post('/notify', validateMyPosWebhook, useCatch(paymentController.handleIPCNotification));
 
 export default PaymentRouter;
-

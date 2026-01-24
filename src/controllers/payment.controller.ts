@@ -12,7 +12,7 @@ import PriceValidationService from './../services/price-validation.service';
 import DocumentDataLayer from './../data-layers/document.data-layer';
 import OrderDataLayer from './../data-layers/order.data-layer';
 
-import { Document, DocumentType } from './../models/document.model';
+import { DocumentType } from './../models/document.model';
 
 import Config from './../config';
 
@@ -58,6 +58,8 @@ export default class PaymentController {
 
     try {
       const { items, userId } = req.body;
+      const authUserId = req.user?._id?.toString();
+      const resolvedUserId = authUserId || userId;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         throw new CustomError(400, 'Missing or invalid items');
@@ -97,9 +99,9 @@ export default class PaymentController {
 
       // Get customer data from authenticated user or request
       const customerData = {
-        email: req.body.customerEmail || '',
-        firstName: req.body.customerFirstName || '',
-        lastName: req.body.customerLastName || '',
+        email: req.body.customerEmail || req.user?.email || '',
+        firstName: req.body.customerFirstName || req.user?.firstName || '',
+        lastName: req.body.customerLastName || req.user?.lastName || '',
         phone: req.body.customerPhone,
         ip: req.ip || req.connection.remoteAddress,
       };
@@ -119,21 +121,14 @@ export default class PaymentController {
       const document = await this.documentDataLayer.create({
         type: DocumentType.Other, // Use "Other" type for packages/orders
         data: documentData,
-        orderData: {
-          userId: userId ? (mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) as any : undefined) : undefined,
-          email: customerData.email,
-          cost: total,
-          paid: false,
-          amount: total,
-          currency: 'EUR',
-        },
+        userId: resolvedUserId as any,
       }, logContext);
 
       // Create order in database using data layer
       const order = await this.orderDataLayer.create({
         orderId,
         documentId: document._id, // Link to the Document collection
-        userId: userId || undefined,
+        userId: resolvedUserId || undefined,
         items: mappedItems,
         subtotal,
         vat,
@@ -143,6 +138,14 @@ export default class PaymentController {
         status: 'pending',
         customerData,
       }, logContext);
+
+      await this.documentDataLayer.update(
+        document._id,
+        {
+          orderId: order._id,
+        },
+        logContext
+      );
 
       // Prepare cart items for myPOS
       const cartItems: CartItem[] = mappedItems.map((item) => ({
@@ -226,7 +229,7 @@ export default class PaymentController {
       }
 
       // Check if order is already paid
-      if (order.status === 'paid') {
+      if (order.status === 'paid' || order.status === 'finished') {
         throw new CustomError(400, 'Order is already paid');
       }
 
@@ -362,29 +365,6 @@ export default class PaymentController {
 
         await order.save();
 
-        // Update the corresponding document
-        if (order.documentId) {
-          try {
-            await this.documentDataLayer.update(
-              order.documentId.toString(),
-              {
-                $set: {
-                  'orderData.paid': true,
-                  'orderData.paidAt': new Date(),
-                  'orderData.paymentLinkId': transactionRef,
-                  'orderData.amount': amount,
-                  'orderData.currency': currency,
-                },
-              },
-              logContext
-            );
-          } catch (docError: any) {
-            logger.error(`Failed to update document: ${docError.message}`, logContext);
-          }
-        } else {
-          logger.error(`Order ${orderID} has no documentId`, logContext);
-        }
-
         // TODO: Generate and send documents
         // await this.generateDocuments(order);
         // await this.sendDocumentsToCustomer(order);
@@ -394,23 +374,7 @@ export default class PaymentController {
         order.failedAt = new Date();
         await order.save();
 
-        // Update the corresponding document
-        if (order.documentId) {
-          try {
-            await this.documentDataLayer.update(
-              order.documentId.toString(),
-              {
-                $set: {
-                  'orderData.paid': false,
-                  'orderData.failedAt': new Date(),
-                },
-              },
-              logContext
-            );
-          } catch (docError: any) {
-            logger.error(`Failed to update document: ${docError.message}`, logContext);
-          }
-        } else {
+        if (!order.documentId) {
           logger.error(`Order ${orderID} has no documentId`, logContext);
         }
       }
@@ -436,7 +400,7 @@ export default class PaymentController {
       const { event_type, payment_link_id, order_id, status, amount, currency } = webhookData;
 
       if (event_type === 'payment.completed' && status === 'success') {
-        await this.updateDocumentPaymentStatus(order_id, {
+        await this.updateOrderPaymentStatus(order_id, {
           paid: true,
           paymentLinkId: payment_link_id,
           paidAt: new Date(),
@@ -445,7 +409,7 @@ export default class PaymentController {
         });
 
       } else if (event_type === 'payment.failed' || status === 'failed') {
-        await this.updateDocumentPaymentStatus(order_id, {
+        await this.updateOrderPaymentStatus(order_id, {
           paid: false,
           paymentLinkId: payment_link_id,
           failedAt: new Date(),
@@ -469,22 +433,20 @@ export default class PaymentController {
   public getPaymentStatus: RequestHandler = async (req, res) => {
     const { orderId } = req.params;
 
-    if (!orderId || !mongoose.isValidObjectId(orderId)) {
+    if (!orderId) {
       throw new CustomError(400, 'Invalid order ID');
     }
 
-    const document = await Document.findById(orderId);
-
-    if (!document) {
-      throw new CustomError(404, 'Order not found');
-    }
+    const order = mongoose.isValidObjectId(orderId)
+      ? await this.orderDataLayer.getById(orderId, this.logContext)
+      : await this.orderDataLayer.getByOrderId(orderId, this.logContext);
 
     res.json({
       orderId,
-      paid: (document.orderData as any)?.paid || false,
-      amount: (document.orderData as any)?.amount,
-      currency: (document.orderData as any)?.currency,
-      paidAt: (document.orderData as any)?.paidAt,
+      paid: order.status === 'paid' || order.status === 'finished',
+      amount: order.paidAmount ?? order.total,
+      currency: order.currency,
+      paidAt: order.paidAt,
     });
   }
 
@@ -523,11 +485,9 @@ export default class PaymentController {
         throw new CustomError(400, 'Invalid order_id format');
       }
 
-      // Verify order exists
-      const document = await Document.findById(order_id);
-      if (!document) {
-        throw new CustomError(404, 'Order not found');
-      }
+      const order = mongoose.isValidObjectId(order_id)
+        ? await this.orderDataLayer.getById(order_id, logContext)
+        : await this.orderDataLayer.getByOrderId(order_id, logContext);
 
 
       // Create payment link via myPOS service
@@ -543,15 +503,18 @@ export default class PaymentController {
       });
 
       // Update document with payment link ID
-      await Document.findByIdAndUpdate(
-        order_id,
+      await this.orderDataLayer.update(
+        order._id,
         {
           $set: {
-            'orderData.paymentLinkId': paymentLink.payment_link_id,
-            'orderData.amount': amount,
-            'orderData.currency': currency,
+            paymentData: {
+              paymentReference: paymentLink.payment_link_id,
+            },
+            paidAmount: amount,
+            currency,
           },
-        }
+        },
+        logContext
       );
 
 
@@ -606,23 +569,28 @@ export default class PaymentController {
     }
   }
 
-  private async updateDocumentPaymentStatus(orderId: string, paymentData: any): Promise<void> {
-    if (!mongoose.isValidObjectId(orderId)) {
-      throw new Error('Invalid order ID');
+  private async updateOrderPaymentStatus(orderId: string, paymentData: any): Promise<void> {
+    const update: any = {
+      paymentData: {
+        paymentReference: paymentData.paymentLinkId,
+      },
+      paidAmount: paymentData.amount,
+      currency: paymentData.currency,
+    };
+
+    if (paymentData.paid) {
+      update.status = 'paid';
+      update.paidAt = paymentData.paidAt || new Date();
+    } else {
+      update.status = 'failed';
+      update.failedAt = paymentData.failedAt || new Date();
     }
 
-    await Document.findByIdAndUpdate(
-      orderId,
-      {
-        $set: {
-          'orderData.paid': paymentData.paid,
-          'orderData.paymentLinkId': paymentData.paymentLinkId,
-          'orderData.paidAt': paymentData.paidAt,
-          'orderData.failedAt': paymentData.failedAt,
-          'orderData.amount': paymentData.amount,
-          'orderData.currency': paymentData.currency,
-        },
-      }
-    );
+    if (mongoose.isValidObjectId(orderId)) {
+      await this.orderDataLayer.update(orderId, { $set: update }, this.logContext);
+      return;
+    }
+
+    await this.orderDataLayer.updateByOrderId(orderId, { $set: update }, this.logContext);
   }
 }

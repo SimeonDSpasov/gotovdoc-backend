@@ -32,24 +32,11 @@ export interface DocumentData {
   [key: string]: any;
 }
 
-export interface DocumentOrder {
-  userId?: ObjectId;
-  email: string;
-  cost: number;
-  paid?: boolean;
-  paymentLinkId?: string;
-  paidAt?: Date;
-  failedAt?: Date;
-  amount?: number;
-  currency?: string;
-  refunded?: boolean;
-  refundedAt?: Date;
-}
-
 interface IDocument {
   type: DocumentType;
   data: DocumentData;
-  orderData?: DocumentOrder;
+  orderId?: ObjectId;
+  userId?: ObjectId;
   createdAt: Date;
 }
 
@@ -63,9 +50,17 @@ const DocumentSchema = new mongoose.Schema<IDocument>({
     type: Object,
     required: true,
   },
-  orderData: {
-    type: Object,
+  orderId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Order',
     required: false,
+    index: true,
+  },
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: false,
+    index: true,
   },
 },
 {

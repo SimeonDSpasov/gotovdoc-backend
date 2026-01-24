@@ -29,7 +29,7 @@ export interface IOrder {
   expectedAmount: number; // Amount we expect to receive (for validation)
   paidAmount?: number; // Actual amount paid
   currency: string;
-  status: 'pending' | 'paid' | 'failed' | 'processing' | 'fraud_attempt' | 'cancelled';
+  status: 'pending' | 'paid' | 'finished' | 'failed' | 'processing' | 'fraud_attempt' | 'cancelled';
   paymentMethod: 'mypos_embedded';
   paymentData?: {
     transactionRef?: string; // IPC_Trnref from myPOS
@@ -127,7 +127,7 @@ const OrderSchema: Schema = new Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'paid', 'failed', 'processing', 'fraud_attempt', 'cancelled'],
+      enum: ['pending', 'paid', 'finished', 'failed', 'processing', 'fraud_attempt', 'cancelled'],
       default: 'pending',
       index: true,
     },

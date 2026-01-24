@@ -47,6 +47,29 @@ export default class AuthMiddleware {
     }
   }
 
+  public attachUserIfPresent: RequestHandler = async (req, res, next) => {
+    const accessToken = this.getAccessTokenFromHeaders(req);
+
+    if (!accessToken) {
+      return next();
+    }
+
+    const logContext = `${this.logContext} -> attachUserIfPresent()`;
+
+    try {
+      const userId = this.tokenUtil.getUserIdFromAccessToken(accessToken);
+      const user = await this.userDataLayer.getById(userId, logContext, '');
+
+      if (!user.suspended) {
+        req.user = user;
+      }
+    } catch (err) {
+      // Ignore invalid or expired tokens for optional auth.
+    }
+
+    next();
+  }
+
   public isAdmin: RequestHandler = (req, res, next) => {
     const user = req.user;
 

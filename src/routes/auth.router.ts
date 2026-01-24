@@ -15,9 +15,13 @@ const AuthRouter = Router();
 
 // Public routes
 AuthRouter.post('/register', useCatch(authController.register));
+
 AuthRouter.post('/login', useCatch(authController.login));
+
 AuthRouter.post('/refresh', useCatch(authController.refreshAccessToken));
+
 AuthRouter.post('/forgotten-password', useCatch(authController.forgottenPassword));
+
 AuthRouter.post('/reset-password', useCatch(authController.resetPassword));
 
 // Protected routes (require authentication)

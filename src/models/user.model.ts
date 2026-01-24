@@ -30,6 +30,15 @@ interface IUser {
   firstName: string;
   lastName: string;
   suspended: boolean,
+  activity?: IUserActivity[];
+  createdAt: Date;
+}
+
+interface IUserActivity {
+  type: 'document_generated' | 'document_downloaded';
+  documentId?: Types.ObjectId;
+  orderId?: string;
+  documentName?: string;
   createdAt: Date;
 }
 
@@ -58,6 +67,32 @@ const UserSchema = new mongoose.Schema<IUser>({
   suspended: {
     type: Boolean,
     default: false,
+  },
+  activity: {
+    type: [{
+      type: {
+        type: String,
+        enum: ['document_generated', 'document_downloaded'],
+        required: true,
+      },
+      documentId: {
+        type: Schema.Types.ObjectId,
+        required: false,
+      },
+      orderId: {
+        type: String,
+        required: false,
+      },
+      documentName: {
+        type: String,
+        required: false,
+      },
+      createdAt: {
+        type: Date,
+        default: () => new Date(),
+      },
+    }],
+    default: [],
   },
 },
 {
@@ -93,4 +128,4 @@ const User = db.model<IUser>('User', UserSchema);
 
 type UserDoc = ReturnType<(typeof User)['hydrate']>;
 
-export { User, UserDoc, IUser, UserRole };
+export { User, UserDoc, IUser, IUserActivity, UserRole };
