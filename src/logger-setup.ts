@@ -49,24 +49,24 @@ export default class LoggerSetup {
   }
 
   private async unhandledErrors(message: string): Promise<void> {
-    // if (this.config.env === 'dev') {
-    //   return;
-    // }
+    if (this.config.env === 'dev') {
+      return;
+    }
 
-    // const emailData = {
-    //   toEmail: this.config.devEmail,
-    //   subject: `Kind Skiptracing ${this.config.env.toUpperCase()} Error`,
-    //   template: 'error',
-    //   payload: {
-    //     where: 'unhandledErrors',
-    //     message,
-    //   },
-    // };
+    const emailData = {
+      toEmail: this.config.supportAccountEmail,
+      subject: `GotovDoc ${this.config.env.toUpperCase()} Error`,
+      template: 'error',
+      payload: {
+        where: 'unhandledErrors',
+        message,
+      },
+    };
   
-    // await this.emailUtil.sendEmail(emailData, EmailType.Info, '')
-    //   .catch(err => console.dir(err, { depth: 10 }));
+    await this.emailUtil.sendEmail(emailData, EmailType.Info, '')
+      .catch(err => console.dir(err, { depth: 10 }));
   
-    // process.exit();
+    process.exit();
   }
 
 }

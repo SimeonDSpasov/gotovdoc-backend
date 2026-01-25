@@ -5,21 +5,26 @@ import LoggerSetup from './logger-setup';
 
 import ConnectionManager from './connection-manager';
 
-
 import AppServer from './app-server';
 import AppProcesses from './app-processes';
-import { EmailUtil } from './utils/email.util';
+import { registerOrderCleanupCron } from './cronjobs/order-cleanup.cron';
 
 (async () => {
   try {
     new LoggerSetup();
 
     await ConnectionManager.getInstance().initConnections();
+
+    if (!process.env.WORKER_ID) {
+      process.env.WORKER_ID = `worker-${Math.floor(Math.random() * 10000)}`;
+    }
+
+    if (process.env.WORKER_ID === 'worker-1') {
+      registerOrderCleanupCron();
+    }
     
     new AppServer();
     new AppProcesses();
-
-    await EmailUtil.getInstance().verify();
   } catch (err: any) {
     logger.error(err, 'App Init Error');
   }

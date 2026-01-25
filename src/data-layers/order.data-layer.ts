@@ -148,6 +148,17 @@ export default class OrderDataLayer {
     return this.updateByOrderId(orderId, update, logContext);
   }
 
+  public async deleteMany(filter: FilterQuery<IOrder>, logContext: string): Promise<number> {
+    logContext = `${logContext} -> ${this.logContext} -> deleteMany()`;
+
+    const result = await Order.deleteMany(filter)
+      .catch(err => {
+        throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
+      });
+
+    return result.deletedCount ?? 0;
+  }
+
   private static instance: OrderDataLayer;
 
   public static getInstance(): OrderDataLayer {

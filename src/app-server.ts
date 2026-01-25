@@ -58,9 +58,6 @@ export default class AppServer {
 
     app.listen(this.config.server.port, () => {
       logger.info(`${workerId} Server Started - Listening on http://${this.config.server.hostname}:${this.config.server.port} (env: ${this.config.env})`);
-
-      if (workerId === 'worker-1') {
-      }
     });
   }
 

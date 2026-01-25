@@ -87,11 +87,6 @@ export class EmailUtil {
 
   private static instance: EmailUtil;
 
-  public async verify(): Promise<void> {
-    const response = await this.transporter.verify();
-    console.log('email verification response:', response);
-  }
-
   public static getInstance(): EmailUtil {
     if (!EmailUtil.instance) {
       EmailUtil.instance = new EmailUtil();

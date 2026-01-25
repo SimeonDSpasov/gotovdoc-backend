@@ -1,6 +1,8 @@
 import LoggerSetup from './logger-setup';
+import logger from '@ipi-soft/logger';
 
 import ConnectionManager from './connection-manager';
+import { registerOrderCleanupCron } from './cronjobs/order-cleanup.cron';
 
 (async () => {
   try {
@@ -8,7 +10,7 @@ import ConnectionManager from './connection-manager';
 
     await ConnectionManager.getInstance().initConnections();
 
-    // TODO: Add worker logic here
+    registerOrderCleanupCron();
   } catch (err: any) {
     logger.error(err, 'Worker Init Error');
   }
