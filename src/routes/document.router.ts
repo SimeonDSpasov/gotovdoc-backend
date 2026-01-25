@@ -17,6 +17,18 @@ DocumentRouter.post(
   useCatch(documentController.generateSpeciment)
 );
 
+DocumentRouter.post(
+  '/mps-power-of-attorney',
+  useCatch(authMiddleware.attachUserIfPresent),
+  useCatch(documentController.generateMpsPowerOfAttorney)
+);
+
+DocumentRouter.post(
+  '/leave-request',
+  useCatch(authMiddleware.attachUserIfPresent),
+  useCatch(documentController.generateLeaveRequest)
+);
+
 DocumentRouter.get(
   '/download/:orderId',
   useCatch(authMiddleware.attachUserIfPresent),

@@ -27,9 +27,23 @@ export default class DocumentController {
   private orderDataLayer = OrderDataLayer.getInstance();
 
   private static readonly templateName = 'speciment.docx';
+  private static readonly mpsPowerOfAttorneyTemplateName = 'Palnomoshtno_MPS_Template.docx';
+  private static readonly leaveRequestTemplateName = 'Molba_Za_Otpusk_Template.docx';
   private static readonly warmTemplate = TemplateCacheUtil.preload(DocumentController.templateName).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
     logger.error(message, 'DocumentController -> TemplateCache preload');
+  });
+  private static readonly warmMpsPowerOfAttorneyTemplate = TemplateCacheUtil.preload(
+    DocumentController.mpsPowerOfAttorneyTemplateName
+  ).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error(message, 'DocumentController -> MpsPowerOfAttorney TemplateCache preload');
+  });
+  private static readonly warmLeaveRequestTemplate = TemplateCacheUtil.preload(
+    DocumentController.leaveRequestTemplateName
+  ).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error(message, 'DocumentController -> LeaveRequest TemplateCache preload');
   });
   private static readonly warmFooter = Promise.resolve();
 
@@ -224,6 +238,351 @@ export default class DocumentController {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="specimen-document.pdf"`);
 
+    res.end(pdfBuffer);
+  }
+
+  public generateMpsPowerOfAttorney: RequestHandler = async (req, res) => {
+    const {
+      principal_full_name,
+      principal_egn,
+      principal_id_number,
+      principal_id_issue_date,
+      principal_id_issuer,
+      principal_address,
+      authorized_full_name,
+      authorized_egn,
+      authorized_id_number,
+      authorized_id_issue_date,
+      authorized_id_issuer,
+      authorized_address,
+      car_type,
+      car_make_model,
+      car_registration_number,
+      car_vin,
+      car_engine_number,
+      car_color,
+      date,
+      place,
+      email,
+    } = req.body;
+
+    if (
+      !principal_full_name ||
+      !principal_egn ||
+      !principal_id_number ||
+      !principal_id_issue_date ||
+      !principal_id_issuer ||
+      !principal_address ||
+      !authorized_full_name ||
+      !authorized_egn ||
+      !authorized_id_number ||
+      !authorized_id_issue_date ||
+      !authorized_id_issuer ||
+      !authorized_address ||
+      !car_type ||
+      !car_make_model ||
+      !car_registration_number ||
+      !car_vin ||
+      !car_engine_number ||
+      !car_color ||
+      !date ||
+      !place ||
+      !email
+    ) {
+      throw new CustomError(400, 'Missing required fields for MPS power of attorney');
+    }
+
+    const logContext = `${this.logContext} -> generateMpsPowerOfAttorney()`;
+
+    const documentData = {
+      principal_full_name,
+      principal_egn,
+      principal_id_number,
+      principal_id_issue_date,
+      principal_id_issuer,
+      principal_address,
+      authorized_full_name,
+      authorized_egn,
+      authorized_id_number,
+      authorized_id_issue_date,
+      authorized_id_issuer,
+      authorized_address,
+      car_type,
+      car_make_model,
+      car_registration_number,
+      car_vin,
+      car_engine_number,
+      car_color,
+      date,
+      place,
+      email,
+    };
+
+    const document = await this.documentDataLayer.create(
+      {
+        type: DocumentType.MpsPowerOfAttorney,
+        data: documentData,
+        userId: req.user?._id as any,
+      },
+      logContext
+    );
+
+    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const order = await this.orderDataLayer.create(
+      {
+        orderId,
+        documentId: document._id,
+        userId: req.user?._id,
+        items: [
+          {
+            id: 'mps-power-of-attorney',
+            type: 'document',
+            name: 'Пълномощно за управление на МПС',
+            description: 'Пълномощно за управление на МПС',
+            price: 0,
+            formData: documentData,
+          },
+        ],
+        subtotal: 0,
+        vat: 0,
+        total: 0,
+        expectedAmount: 0,
+        currency: 'EUR',
+        status: 'finished',
+        customerData: {
+          email,
+          firstName: req.user?.firstName,
+          lastName: req.user?.lastName,
+          ip: req.ip || req.connection.remoteAddress,
+        },
+        documentsGenerated: true,
+        documentsSent: false,
+      },
+      logContext
+    );
+
+    await this.documentDataLayer.update(
+      document._id,
+      {
+        orderId: order._id,
+        userId: req.user?._id,
+      },
+      logContext
+    );
+
+    const activityUserId = req.user?._id;
+
+    if (activityUserId) {
+      this.userDataLayer.appendActivity(
+        activityUserId,
+        {
+          type: 'document_generated',
+          documentId: document._id,
+          documentName: 'Пълномощно за управление на МПС',
+          createdAt: new Date(),
+        },
+        logContext
+      ).catch((err: any) => logger.error(`Failed to store activity: ${err.message}`, logContext));
+    }
+
+    await Promise.allSettled([
+      DocumentController.warmMpsPowerOfAttorneyTemplate,
+      DocumentController.warmFooter,
+    ]);
+
+    const templateBuffer = await TemplateCacheUtil.getTemplate(
+      DocumentController.mpsPowerOfAttorneyTemplateName
+    );
+
+    const filledDocx = DocumentController.renderTemplate(templateBuffer, documentData);
+
+    let pdfStream: Readable;
+    try {
+      pdfStream = await LibreOfficeConverter.docxBufferToPdfStream(filledDocx);
+    } catch (err) {
+      throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${logContext} -> convertToPdf`);
+    }
+
+    const pdfBuffer = await DocumentController.streamToBuffer(pdfStream);
+
+    const emailData = {
+      toEmail: email,
+      subject: 'Вашият документ е генериран',
+      template: 'document-generated',
+      payload: {
+        fullName: principal_full_name,
+        companyName: '',
+        documentName: 'Пълномощно за управление на МПС',
+      },
+      attachments: [
+        {
+          filename: 'palnomoshtno-mps.pdf',
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    };
+
+    this.emailUtil.sendEmail(emailData, EmailType.Info, this.logContext)
+      .catch((err: any) => logger.error(`Failed to send document email: ${err.message}`, this.logContext));
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="palnomoshtno-mps.pdf"`);
+    res.end(pdfBuffer);
+  }
+
+  public generateLeaveRequest: RequestHandler = async (req, res) => {
+    const {
+      company_name,
+      employee_full_name,
+      employee_position,
+      leave_type,
+      leave_days,
+      start_date,
+      request_date,
+      email,
+    } = req.body;
+
+    if (
+      !company_name ||
+      !employee_full_name ||
+      !employee_position ||
+      !leave_type ||
+      !leave_days ||
+      !start_date ||
+      !request_date ||
+      !email
+    ) {
+      throw new CustomError(400, 'Missing required fields for leave request');
+    }
+
+    if (leave_type !== 'платен' && leave_type !== 'неплатен') {
+      throw new CustomError(400, 'Invalid leave_type (expected: платен или неплатен)');
+    }
+
+    const logContext = `${this.logContext} -> generateLeaveRequest()`;
+
+    const documentData = {
+      company_name,
+      employee_full_name,
+      employee_position,
+      leave_type,
+      leave_days,
+      start_date,
+      request_date,
+      email,
+    };
+
+    const document = await this.documentDataLayer.create(
+      {
+        type: DocumentType.LeaveRequest,
+        data: documentData,
+        userId: req.user?._id as any,
+      },
+      logContext
+    );
+
+    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const order = await this.orderDataLayer.create(
+      {
+        orderId,
+        documentId: document._id,
+        userId: req.user?._id,
+        items: [
+          {
+            id: 'leave-request',
+            type: 'document',
+            name: 'Молба за отпуск',
+            description: 'Молба за отпуск',
+            price: 0,
+            formData: documentData,
+          },
+        ],
+        subtotal: 0,
+        vat: 0,
+        total: 0,
+        expectedAmount: 0,
+        currency: 'EUR',
+        status: 'finished',
+        customerData: {
+          email,
+          firstName: req.user?.firstName,
+          lastName: req.user?.lastName,
+          ip: req.ip || req.connection.remoteAddress,
+        },
+        documentsGenerated: true,
+        documentsSent: false,
+      },
+      logContext
+    );
+
+    await this.documentDataLayer.update(
+      document._id,
+      {
+        orderId: order._id,
+        userId: req.user?._id,
+      },
+      logContext
+    );
+
+    const activityUserId = req.user?._id;
+
+    if (activityUserId) {
+      this.userDataLayer.appendActivity(
+        activityUserId,
+        {
+          type: 'document_generated',
+          documentId: document._id,
+          documentName: 'Молба за отпуск',
+          createdAt: new Date(),
+        },
+        logContext
+      ).catch((err: any) => logger.error(`Failed to store activity: ${err.message}`, logContext));
+    }
+
+    await Promise.allSettled([
+      DocumentController.warmLeaveRequestTemplate,
+      DocumentController.warmFooter,
+    ]);
+
+    const templateBuffer = await TemplateCacheUtil.getTemplate(
+      DocumentController.leaveRequestTemplateName
+    );
+
+    const filledDocx = DocumentController.renderTemplate(templateBuffer, documentData);
+
+    let pdfStream: Readable;
+    try {
+      pdfStream = await LibreOfficeConverter.docxBufferToPdfStream(filledDocx);
+    } catch (err) {
+      throw new CustomError(500, (err as Error)?.message ?? 'Failed to convert DOCX to PDF', `${logContext} -> convertToPdf`);
+    }
+
+    const pdfBuffer = await DocumentController.streamToBuffer(pdfStream);
+
+    const emailData = {
+      toEmail: email,
+      subject: 'Вашият документ е генериран',
+      template: 'document-generated',
+      payload: {
+        fullName: employee_full_name,
+        companyName: company_name,
+        documentName: 'Молба за отпуск',
+      },
+      attachments: [
+        {
+          filename: 'molba-za-otpusk.pdf',
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    };
+
+    this.emailUtil.sendEmail(emailData, EmailType.Info, this.logContext)
+      .catch((err: any) => logger.error(`Failed to send document email: ${err.message}`, this.logContext));
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="molba-za-otpusk.pdf"`);
     res.end(pdfBuffer);
   }
 

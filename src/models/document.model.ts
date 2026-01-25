@@ -8,6 +8,8 @@ import Config from './../config';
 export enum DocumentType {
   Speciment,
   PowerOfAttorney,
+  MpsPowerOfAttorney,
+  LeaveRequest,
   Certificate,
   License,
   Passport,
