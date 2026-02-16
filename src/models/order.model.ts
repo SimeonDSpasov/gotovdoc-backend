@@ -30,12 +30,12 @@ export interface IOrder {
   paidAmount?: number; // Actual amount paid
   currency: string;
   status: 'pending' | 'paid' | 'finished' | 'failed' | 'processing' | 'fraud_attempt' | 'cancelled';
-  paymentMethod: 'mypos_embedded';
+  paymentMethod: 'stripe';
   paymentData?: {
-    transactionRef?: string; // IPC_Trnref from myPOS
-    cardMask?: string;
-    authCode?: string;
-    paymentReference?: string;
+    transactionRef?: string;
+    checkoutSessionId?: string;
+    paymentIntentId?: string;
+    receiptUrl?: string;
   };
   customerData: {
     email?: string;
@@ -98,7 +98,7 @@ const OrderSchema: Schema = new Schema(
         name: { type: String, required: true },
         description: String,
         price: { type: Number, required: true },
-        formData: { type: Schema.Types.Mixed, required: true },
+        formData: { type: Schema.Types.Mixed, default: {} },
         documentIds: [String],
       }],
       required: true,
@@ -133,13 +133,13 @@ const OrderSchema: Schema = new Schema(
     },
     paymentMethod: {
       type: String,
-      default: 'mypos_embedded',
+      default: 'stripe',
     },
     paymentData: {
       transactionRef: String,
-      cardMask: String,
-      authCode: String,
-      paymentReference: String,
+      checkoutSessionId: String,
+      paymentIntentId: String,
+      receiptUrl: String,
     },
     customerData: {
       email: String,

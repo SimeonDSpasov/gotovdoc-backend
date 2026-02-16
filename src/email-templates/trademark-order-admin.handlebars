@@ -1,0 +1,88 @@
+<div style="margin-bottom: 30px;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 0 20px 0;">
+    <tr>
+      <td style="width: 64px; height: 64px; background: linear-gradient(135deg, #1db4a1 0%, #16a085 100%); border-radius: 50%; text-align: center; vertical-align: middle;">
+        <span style="font-size: 30px; line-height: 1; display: inline-block; margin-top: -4px;">™️</span>
+      </td>
+    </tr>
+  </table>
+  <h2 style="color: #ffffff; margin: 10px 0 10px 0; font-size: 24px; font-weight: 600;">Нова поръчка</h2>
+  <p style="color: #8b9db5; font-size: 14px; margin: 0;">Регистрация на търговска марка</p>
+</div>
+
+<div style="margin: 30px 0;">
+  <h3 style="color: #ffffff; font-size: 16px; font-weight: 600; margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 2px solid rgba(29, 180, 161, 0.3);">📦 Детайли за поръчката</h3>
+  <div style="margin-bottom: 12px; padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">НОМЕР</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0; font-family: 'Courier New', monospace;">{{orderId}}</p>
+  </div>
+  <div style="margin-bottom: 12px; padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">СЪЗДАДЕНА</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0;">{{createdAt}}</p>
+  </div>
+  <div style="margin-bottom: 12px; padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">МЕТОД НА ПРЕДАВАНЕ</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0;">{{deliveryMethod}}</p>
+  </div>
+  <div style="padding: 15px 20px; background-color: rgba(29, 180, 161, 0.15); border-radius: 8px; border: 1px solid rgba(29, 180, 161, 0.3);">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ОБЩА СУМА</p>
+    <p style="color: #1db4a1; font-size: 18px; margin: 0; font-weight: 700;">€{{total}} {{currency}}</p>
+  </div>
+</div>
+
+<div style="margin: 30px 0;">
+  <h3 style="color: #ffffff; font-size: 16px; font-weight: 600; margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 2px solid rgba(29, 180, 161, 0.3);">👤 Клиент</h3>
+  <div style="margin-bottom: 12px; padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ИМЕНА</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0;">{{customerName}}</p>
+  </div>
+  <div style="margin-bottom: 12px; padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ИМЕЙЛ</p>
+    <p style="color: #1db4a1; font-size: 14px; margin: 0;">{{customerEmail}}</p>
+  </div>
+  <div style="padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ТЕЛЕФОН</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0;">{{customerPhone}}</p>
+  </div>
+</div>
+
+{{#if isCompany}}
+<div style="margin: 30px 0;">
+  <h3 style="color: #ffffff; font-size: 16px; font-weight: 600; margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 2px solid rgba(29, 180, 161, 0.3);">🏢 Фирма</h3>
+  <div style="margin-bottom: 12px; padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ИМЕ</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0;">{{companyName}}</p>
+  </div>
+  <div style="padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ЕИК</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0; font-family: 'Courier New', monospace;">{{companyEik}}</p>
+  </div>
+</div>
+{{/if}}
+
+<div style="margin: 30px 0;">
+  <h3 style="color: #ffffff; font-size: 16px; font-weight: 600; margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 2px solid rgba(29, 180, 161, 0.3);">™️ Търговска марка</h3>
+  <div style="margin-bottom: 12px; padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ВИД</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0;">{{markType}}</p>
+  </div>
+  <div style="margin-bottom: 12px; padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">ТЕКСТ</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0;">{{markText}}</p>
+  </div>
+  <div style="margin-bottom: 12px; padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">КЛАСОВЕ</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0;">{{niceClasses}}</p>
+  </div>
+  <div style="padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">СТОКИ И УСЛУГИ</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0; line-height: 1.6;">{{goodsAndServices}}</p>
+  </div>
+</div>
+
+{{#if hasUploads}}
+<div style="margin: 30px 0; padding: 20px; background-color: rgba(29, 180, 161, 0.1); border-radius: 8px; border-left: 4px solid #1db4a1;">
+  <p style="color: #8b9db5; font-size: 12px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">КАЧЕНИ ФАЙЛОВЕ</p>
+  <p style="color: #e8edf3; font-size: 14px; margin: 0; line-height: 1.6;">{{uploadCount}} файл(а) качени към поръчката.</p>
+</div>
+{{/if}}

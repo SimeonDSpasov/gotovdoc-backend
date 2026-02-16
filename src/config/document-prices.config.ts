@@ -19,6 +19,7 @@ export enum PackageType {
   EMPLOYMENT_PACKAGE = 'employment_package',
   COMPANY_STARTER_PACKAGE = 'company_starter_package',
   TEST_PRODUCTION_PACKAGE = 'test_production_package',
+  TRADEMARK_REGISTRATION = 'trademark_registration',
 }
 
 // Individual document prices (in EUR)
@@ -35,6 +36,7 @@ export const PACKAGE_PRICES: Record<PackageType, number> = {
   [PackageType.EMPLOYMENT_PACKAGE]: 100,
   [PackageType.COMPANY_STARTER_PACKAGE]: 100,
   [PackageType.TEST_PRODUCTION_PACKAGE]: 1,
+  [PackageType.TRADEMARK_REGISTRATION]: 150,
 };
 
 // Package document composition
@@ -51,6 +53,7 @@ export const PACKAGE_DOCUMENTS: Record<PackageType, DocumentType[]> = {
   [PackageType.TEST_PRODUCTION_PACKAGE]: [
     DocumentType.SPECIMENT_TEST,
   ],
+  [PackageType.TRADEMARK_REGISTRATION]: [],
 };
 
 // VAT rate (20%)

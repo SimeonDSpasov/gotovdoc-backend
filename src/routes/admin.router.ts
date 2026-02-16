@@ -6,6 +6,7 @@ import { Router } from 'express';
 
 import AdminController from './../controllers/admin.controller';
 import AuthMiddleware from './../middlewares/auth.middleware';
+import TrademarkAdminRouter from './admin/trademark-admin.router';
 
 const adminController = AdminController.getInstance();
 const authMiddleware = AuthMiddleware.getInstance();
@@ -64,5 +65,8 @@ AdminRouter.get('/orders/:id', adminController.getOrderById);
 AdminRouter.get('/orders/:id/uploads/:fileId', adminController.downloadOrderUpload);
 AdminRouter.patch('/orders/:id', adminController.updateOrder);
 AdminRouter.post('/orders/:id/upload', upload.array('files', 5), adminController.uploadOrderFiles);
+
+// Trademark admin routes
+AdminRouter.use('/trademark', TrademarkAdminRouter);
 
 export default AdminRouter;

@@ -35,7 +35,7 @@ interface IUser {
 }
 
 interface IUserActivity {
-  type: 'document_generated' | 'document_downloaded';
+  type: 'document_generated' | 'document_downloaded' | 'trademark_order_created' | 'trademark_poa_downloaded';
   documentId?: Types.ObjectId;
   orderId?: string;
   documentName?: string;
@@ -72,7 +72,7 @@ const UserSchema = new mongoose.Schema<IUser>({
     type: [{
       type: {
         type: String,
-        enum: ['document_generated', 'document_downloaded'],
+        enum: ['document_generated', 'document_downloaded', 'trademark_order_created', 'trademark_poa_downloaded'],
         required: true,
       },
       documentId: {
