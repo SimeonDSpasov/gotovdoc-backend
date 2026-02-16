@@ -18,6 +18,7 @@ import { EmailType, EmailUtil } from './../utils/email.util';
 import {
   DOCUMENT_GENERATORS,
   DocumentRequestType,
+  toBulgarianDate,
 } from './../config/document-templates.config';
 
 export default class DocumentController {
@@ -76,7 +77,18 @@ export default class DocumentController {
     ]);
 
     const templateBuffer = await TemplateCacheUtil.getTemplate(config.templateName);
-    const filledDocx = DocumentController.renderTemplate(templateBuffer, document.data);
+
+    // Format dates for rendering (handles both new and legacy stored data)
+    const renderData = { ...document.data };
+    if (config.dateFields) {
+      for (const field of config.dateFields) {
+        if (renderData[field]) {
+          renderData[field] = toBulgarianDate(renderData[field]);
+        }
+      }
+    }
+
+    const filledDocx = DocumentController.renderTemplate(templateBuffer, renderData);
   
     let pdfStream: Readable;
     try {
@@ -152,6 +164,15 @@ export default class DocumentController {
 
     if (config.validate) {
       config.validate(documentData);
+    }
+
+    // Convert date fields to Bulgarian format (dd.mm.yyyy г.)
+    if (config.dateFields) {
+      for (const field of config.dateFields) {
+        if (documentData[field]) {
+          documentData[field] = toBulgarianDate(documentData[field]);
+        }
+      }
     }
 
     const document = await this.documentDataLayer.create(
@@ -261,10 +282,33 @@ export default class DocumentController {
     res.end(pdfBuffer);
   }
 
+  private static decodeHtmlEntities(value: string): string {
+    return value
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+  }
+
+  private static sanitizeData(data: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(data)) {
+      if (typeof value === 'string') {
+        result[key] = DocumentController.decodeHtmlEntities(value);
+      } else {
+        result[key] = value;
+      }
+    }
+
+    return result;
+  }
+
   private static renderTemplate(templateBuffer: Buffer, data: Record<string, unknown>): Buffer {
     const zip = new PizZip(templateBuffer);
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-    doc.render(data);
+    doc.render(DocumentController.sanitizeData(data));
     return doc.getZip().generate({ type: "nodebuffer" });
   }
 

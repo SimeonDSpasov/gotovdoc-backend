@@ -3,10 +3,32 @@ import CustomError from './../utils/custom-error.utils';
 
 export type DocumentRequestType = 'speciment' | 'mps_power_of_attorney' | 'leave_request';
 
+/**
+ * Convert a date string (ISO or similar) to Bulgarian format: dd.mm.yyyy г.
+ * Handles: "2026-02-20", "2026-02-20T00:00:00Z", "20.02.2026", etc.
+ */
+export function toBulgarianDate(value: string): string {
+  if (!value) return value;
+
+  // Already in dd.mm.yyyy format
+  if (/^\d{2}\.\d{2}\.\d{4}/.test(value)) {
+    return value.replace(/ г\.?$/, '') + ' г.';
+  }
+
+  // ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss
+  const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return `${isoMatch[3]}.${isoMatch[2]}.${isoMatch[1]} г.`;
+  }
+
+  return value;
+}
+
 export interface DocumentGeneratorConfig {
   type: DocumentType;
   templateName: string;
   requiredFields: string[];
+  dateFields?: string[];
   documentName: string;
   fileName: string;
   orderItem: {
@@ -36,6 +58,7 @@ export const DOCUMENT_GENERATORS: Record<DocumentRequestType, DocumentGeneratorC
       'company_adress',
       'email',
     ],
+    dateFields: ['id_year'],
     documentName: 'Спесимент',
     fileName: 'specimen-document.pdf',
     orderItem: {
@@ -75,6 +98,7 @@ export const DOCUMENT_GENERATORS: Record<DocumentRequestType, DocumentGeneratorC
       'place',
       'email',
     ],
+    dateFields: ['date', 'principal_id_issue_date', 'authorized_id_issue_date'],
     documentName: 'Пълномощно за управление на МПС',
     fileName: 'palnomoshtno-mps.pdf',
     orderItem: {
@@ -101,6 +125,7 @@ export const DOCUMENT_GENERATORS: Record<DocumentRequestType, DocumentGeneratorC
       'request_date',
       'email',
     ],
+    dateFields: ['start_date', 'request_date'],
     documentName: 'Молба за отпуск',
     fileName: 'molba-za-otpusk.pdf',
     orderItem: {
@@ -117,6 +142,10 @@ export const DOCUMENT_GENERATORS: Record<DocumentRequestType, DocumentGeneratorC
       if (data.leave_type !== 'платен' && data.leave_type !== 'неплатен') {
         throw new CustomError(400, 'Invalid leave_type (expected: платен или неплатен)');
       }
+
+      data.legal_basis = data.leave_type === 'платен'
+        ? 'чл. 155, ал. 1'
+        : 'чл. 160, ал. 1';
     },
   },
 };

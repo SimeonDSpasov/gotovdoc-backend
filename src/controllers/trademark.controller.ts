@@ -362,10 +362,24 @@ export default class TrademarkController {
     await pipeline(pdfStream, res);
   }
 
+  private static decodeHtmlEntities(value: string): string {
+    return value
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&');
+  }
+
   private static renderTemplate(templateBuffer: Buffer, data: Record<string, unknown>): Buffer {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      sanitized[key] = typeof value === 'string' ? TrademarkController.decodeHtmlEntities(value) : value;
+    }
+
     const zip = new PizZip(templateBuffer);
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-    doc.render(data);
+    doc.render(sanitized);
     return doc.getZip().generate({ type: 'nodebuffer' });
   }
 
