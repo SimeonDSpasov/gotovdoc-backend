@@ -70,6 +70,12 @@ export default class Config {
   public stripeApiSecretKey = process.env.STRIPE_API_SECRET_KEY || '';
   public stripeWebhookSigningSecret = process.env.STRIPE_WEBHOOK_SIGNING_SECRET || '';
 
+  // EUIPO
+  public euipoClientId = process.env.EUIPO_CLIENT_ID || '';
+  public euipoClientSecret = process.env.EUIPO_CLIENT_SECRET || '';
+  public euipoBaseUrl = process.env.EUIPO_BASE_URL || 'https://api-sandbox.euipo.europa.eu/goods-and-services';
+  public euipoTokenUrl = process.env.EUIPO_TOKEN_URL || 'https://auth-sandbox.euipo.europa.eu/oidc/accessToken';
+
   private static instance: Config;
 
   public static getInstance(): Config {

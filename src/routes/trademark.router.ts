@@ -8,10 +8,12 @@ import AuthMiddleware from './../middlewares/auth.middleware';
 import CatchUtil from './../utils/catch.util';
 
 import TrademarkController from './../controllers/trademark.controller';
+import EuipoController from './../controllers/euipo.controller';
 
 const useCatch = CatchUtil.getUseCatch();
 const authMiddleware = AuthMiddleware.getInstance();
 const trademarkController = new TrademarkController();
+const euipoController = new EuipoController();
 
 const TrademarkRouter = Router();
 
@@ -64,5 +66,10 @@ TrademarkRouter.get(
   useCatch(authMiddleware.attachUserIfPresent),
   useCatch(trademarkController.downloadPowerOfAttorney)
 );
+
+// EUIPO Goods & Services endpoints (public, no auth — served from DB)
+TrademarkRouter.get('/class-headings', useCatch(euipoController.getClassHeadings));
+TrademarkRouter.get('/search-terms', useCatch(euipoController.searchTerms));
+TrademarkRouter.get('/cache-stats', useCatch(euipoController.getCacheStats));
 
 export default TrademarkRouter;

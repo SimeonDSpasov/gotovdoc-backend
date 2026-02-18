@@ -8,6 +8,7 @@ import ConnectionManager from './connection-manager';
 import AppServer from './app-server';
 import AppProcesses from './app-processes';
 import { registerOrderCleanupCron } from './cronjobs/order-cleanup.cron';
+import EuipoService from './services/euipo.service';
 
 (async () => {
   try {
@@ -21,6 +22,9 @@ import { registerOrderCleanupCron } from './cronjobs/order-cleanup.cron';
 
     if (process.env.WORKER_ID === 'worker-1') {
       registerOrderCleanupCron();
+
+      // Only worker-1 syncs with EUIPO; all workers read from DB
+      EuipoService.getInstance().startSync();
     }
     
     new AppServer();
