@@ -48,6 +48,16 @@ export default class EuipoController {
   }
 
   /**
+   * GET /api/trademark/class-descriptions
+   * Returns classNumber + description for all 45 classes.
+   */
+  public getClassDescriptions: RequestHandler = async (req, res) => {
+    const data = await this.euipoService.getClassDescriptions();
+
+    res.status(200).json({ success: true, data });
+  }
+
+  /**
    * GET /api/trademark/cache-stats
    * Returns sync status per class (for monitoring/admin).
    */

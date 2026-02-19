@@ -5,6 +5,7 @@ import { EuipoClass, IEuipoClass, IEuipoTerm } from './../models/euipo-cache.mod
 interface ClassHeading {
   classNumber: number;
   heading: string;
+  description: string;
   totalTerms: number;
   syncedAt: Date | null;
 }
@@ -35,13 +36,14 @@ export default class EuipoCacheDataLayer {
     logContext = `${logContext} -> ${this.logContext} -> getAllClasses()`;
 
     try {
-      const docs = await EuipoClass.find({}, { classNumber: 1, heading: 1, totalTerms: 1, syncedAt: 1 })
+      const docs = await EuipoClass.find({}, { classNumber: 1, heading: 1, description: 1, totalTerms: 1, syncedAt: 1 })
         .sort({ classNumber: 1 })
         .lean();
 
       return docs.map(d => ({
         classNumber: d.classNumber,
         heading: d.heading,
+        description: d.description,
         totalTerms: d.totalTerms,
         syncedAt: d.syncedAt,
       }));
@@ -54,6 +56,7 @@ export default class EuipoCacheDataLayer {
   public async upsertClass(
     classNumber: number,
     heading: string,
+    description: string,
     terms: IEuipoTerm[],
     totalTerms: number,
     logContext: string,
@@ -63,11 +66,47 @@ export default class EuipoCacheDataLayer {
     try {
       await EuipoClass.findOneAndUpdate(
         { classNumber },
-        { classNumber, heading, terms, totalTerms, syncedAt: new Date() },
+        { classNumber, heading, description, terms, totalTerms, syncedAt: new Date() },
         { upsert: true, new: true },
       );
     } catch (err: any) {
       logger.error(`${err.message} -> classNumber: ${classNumber}`, logContext);
+    }
+  }
+
+  public async upsertDescription(
+    classNumber: number,
+    description: string,
+    logContext: string,
+  ): Promise<void> {
+    logContext = `${logContext} -> ${this.logContext} -> upsertDescription()`;
+
+    try {
+      await EuipoClass.findOneAndUpdate(
+        { classNumber },
+        { $set: { description }, $setOnInsert: { classNumber, heading: '', terms: [], totalTerms: 0, syncedAt: null } },
+        { upsert: true },
+      );
+    } catch (err: any) {
+      logger.error(`${err.message} -> classNumber: ${classNumber}`, logContext);
+    }
+  }
+
+  public async getClassDescriptions(logContext: string): Promise<{ classNumber: number; description: string }[]> {
+    logContext = `${logContext} -> ${this.logContext} -> getClassDescriptions()`;
+
+    try {
+      const docs = await EuipoClass.find({}, { classNumber: 1, description: 1 })
+        .sort({ classNumber: 1 })
+        .lean();
+
+      return docs.map(d => ({
+        classNumber: d.classNumber,
+        description: d.description,
+      }));
+    } catch (err: any) {
+      logger.error(err.message, logContext);
+      return [];
     }
   }
 

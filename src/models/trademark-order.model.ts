@@ -2,9 +2,32 @@ import mongoose, { Schema } from 'mongoose';
 
 import Config from './../config';
 
+// ── Reusable sub-schema for file references stored in GridFS ──
+
+const fileRefFields = {
+  fileId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  filename: { type: String, required: true },
+  mimetype: { type: String, required: true },
+  size: { type: Number, required: true },
+  uploadedAt: { type: Date, default: () => new Date() },
+};
+
+// ── File reference interface ──
+
+interface IFileRef {
+  fileId: mongoose.Types.ObjectId;
+  filename: string;
+  mimetype: string;
+  size: number;
+  uploadedAt?: Date;
+}
+
+// ── Main interface ──
+
 export interface ITrademarkOrder {
   orderId: string;
   status: 'pending' | 'paid' | 'processing' | 'submitted_to_bpo' | 'published' | 'registered' | 'rejected' | 'cancelled';
+
   customerData: {
     email: string;
     firstName: string;
@@ -19,15 +42,65 @@ export interface ITrademarkOrder {
     companyAddress?: string;
     ip?: string;
   };
+
   trademarkData: {
-    markType: 'word' | 'combined' | 'figurative' | 'other';
+    markType: 'word' | 'figurative' | 'combined' | '3d' | 'color' | 'sound'
+      | 'hologram' | 'position' | 'pattern' | 'motion' | 'multimedia' | 'other';
     markText?: string;
     markImageFileId?: mongoose.Types.ObjectId;
+    description?: string;
+    isCollective: boolean;
+    isCertified: boolean;
     goodsAndServices: string;
     niceClasses: number[];
-    priorityDocument?: string;
+    customTerms: Record<string, string>;
+    selectedTerms: Record<string, Array<{
+      text: string;
+      classNumber: number;
+      conceptId?: string;
+      status: string;
+    }>>;
+    priorityClaims: Array<{
+      country: string;
+      applicationDate: string;
+      applicationNumber: string;
+      certificateAttached: boolean;
+      partialPriority: boolean;
+    }>;
+    exhibitionPriorities: Array<{
+      exhibitionName: string;
+      firstShowingDate: string;
+      documentAttached: boolean;
+    }>;
+    hasInternationalTransformation: boolean;
+    internationalRegistrationNumber?: string;
+    hasEuConversion: boolean;
+    euConversion?: {
+      euTrademarkNumber: string;
+      manualEntry: boolean;
+    };
   };
+
+  correspondenceAddress: {
+    fullName: string;
+    streetAddress: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  };
+
+  powerOfAttorneyData?: {
+    managerFullName: string;
+    managerEgn: string;
+    managerAddress: string;
+    companyName: string;
+    companyType: string;
+    city: string;
+  };
+
+  powerOfAttorneyDelivery?: 'upload' | 'physical';
   deliveryMethod: 'email' | 'address';
+
   paymentData?: {
     method: 'stripe';
     transactionRef?: string;
@@ -37,21 +110,29 @@ export interface ITrademarkOrder {
     paymentIntentId?: string;
     receiptUrl?: string;
   };
+
   pricing: {
     subtotal: number;
     vat: number;
     total: number;
     currency: string;
   };
+
   documentId?: mongoose.Types.ObjectId;
   userId?: mongoose.Types.ObjectId;
-  userUploadedFiles: Array<{
-    fileId: mongoose.Types.ObjectId;
-    filename: string;
-    mimetype: string;
-    size: number;
-    uploadedAt?: Date;
-  }>;
+
+  // Categorized file references
+  markFile?: IFileRef;
+  collectiveFile?: IFileRef;
+  certifiedFile?: IFileRef;
+  poaFiles: IFileRef[];
+  conventionCertificateFiles: IFileRef[];
+  exhibitionDocumentFiles: IFileRef[];
+  additionalFiles: IFileRef[];
+
+  // Backward-compatible flat list of all uploaded files
+  userUploadedFiles: IFileRef[];
+
   adminNotes?: string;
   finishedFiles?: Array<{
     filename: string;
@@ -67,6 +148,8 @@ export interface ITrademarkOrder {
   updatedAt: Date;
 }
 
+// ── Schema ──
+
 const TrademarkOrderSchema: Schema = new Schema(
   {
     orderId: {
@@ -81,6 +164,8 @@ const TrademarkOrderSchema: Schema = new Schema(
       default: 'pending',
       index: true,
     },
+
+    // ── Customer Data ──
     customerData: {
       email: { type: String, required: true },
       firstName: { type: String, required: true },
@@ -95,10 +180,13 @@ const TrademarkOrderSchema: Schema = new Schema(
       companyAddress: String,
       ip: String,
     },
+
+    // ── Trademark Data ──
     trademarkData: {
       markType: {
         type: String,
-        enum: ['word', 'combined', 'figurative', 'other'],
+        enum: ['word', 'figurative', 'combined', '3d', 'color', 'sound',
+               'hologram', 'position', 'pattern', 'motion', 'multimedia', 'other'],
         required: true,
       },
       markText: String,
@@ -106,7 +194,10 @@ const TrademarkOrderSchema: Schema = new Schema(
         type: mongoose.Schema.Types.ObjectId,
         required: false,
       },
-      goodsAndServices: { type: String, required: true },
+      description: String,
+      isCollective: { type: Boolean, default: false },
+      isCertified: { type: Boolean, default: false },
+      goodsAndServices: { type: String, default: '' },
       niceClasses: {
         type: [Number],
         required: true,
@@ -115,13 +206,65 @@ const TrademarkOrderSchema: Schema = new Schema(
           message: 'At least one Nice class is required',
         },
       },
-      priorityDocument: String,
+      customTerms: { type: Schema.Types.Mixed, default: {} },
+      selectedTerms: { type: Schema.Types.Mixed, default: {} },
+      priorityClaims: {
+        type: [{
+          country: { type: String, required: true },
+          applicationDate: { type: String, required: true },
+          applicationNumber: { type: String, required: true },
+          certificateAttached: { type: Boolean, default: false },
+          partialPriority: { type: Boolean, default: false },
+        }],
+        default: [],
+      },
+      exhibitionPriorities: {
+        type: [{
+          exhibitionName: { type: String, required: true },
+          firstShowingDate: { type: String, required: true },
+          documentAttached: { type: Boolean, default: false },
+        }],
+        default: [],
+      },
+      hasInternationalTransformation: { type: Boolean, default: false },
+      internationalRegistrationNumber: String,
+      hasEuConversion: { type: Boolean, default: false },
+      euConversion: {
+        euTrademarkNumber: String,
+        manualEntry: { type: Boolean, default: false },
+      },
     },
+
+    // ── Correspondence Address ──
+    correspondenceAddress: {
+      fullName: { type: String, required: true },
+      streetAddress: { type: String, required: true },
+      city: { type: String, required: true },
+      postalCode: { type: String, required: true },
+      country: { type: String, required: true },
+    },
+
+    // ── Power of Attorney ──
+    powerOfAttorneyData: {
+      managerFullName: String,
+      managerEgn: String,
+      managerAddress: String,
+      companyName: String,
+      companyType: String,
+      city: String,
+    },
+    powerOfAttorneyDelivery: {
+      type: String,
+      enum: ['upload', 'physical'],
+    },
+
     deliveryMethod: {
       type: String,
       enum: ['email', 'address'],
       default: 'email',
     },
+
+    // ── Payment ──
     paymentData: {
       method: { type: String, default: 'stripe' },
       transactionRef: String,
@@ -137,6 +280,7 @@ const TrademarkOrderSchema: Schema = new Schema(
       total: { type: Number, required: true },
       currency: { type: String, required: true, default: 'EUR' },
     },
+
     documentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Document',
@@ -148,6 +292,17 @@ const TrademarkOrderSchema: Schema = new Schema(
       ref: 'User',
       required: false,
     },
+
+    // ── Categorized Files ──
+    markFile: { type: fileRefFields, required: false },
+    collectiveFile: { type: fileRefFields, required: false },
+    certifiedFile: { type: fileRefFields, required: false },
+    poaFiles: { type: [fileRefFields], default: [] },
+    conventionCertificateFiles: { type: [fileRefFields], default: [] },
+    exhibitionDocumentFiles: { type: [fileRefFields], default: [] },
+    additionalFiles: { type: [fileRefFields], default: [] },
+
+    // ── Backward-compatible flat file list ──
     userUploadedFiles: {
       type: [{
         fileId: { type: mongoose.Schema.Types.ObjectId, required: true },
@@ -159,6 +314,7 @@ const TrademarkOrderSchema: Schema = new Schema(
       required: false,
       default: [],
     },
+
     adminNotes: {
       type: String,
       default: '',

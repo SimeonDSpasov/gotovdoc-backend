@@ -11,6 +11,7 @@ interface IEuipoTerm {
 interface IEuipoClass {
   classNumber: number;
   heading: string;
+  description: string;
   terms: IEuipoTerm[];
   totalTerms: number;
   syncedAt: Date | null;
@@ -29,6 +30,7 @@ const EuipoClassSchema = new Schema<IEuipoClass>(
   {
     classNumber: { type: Number, required: true },
     heading: { type: String, default: '' },
+    description: { type: String, default: '' },
     terms: { type: [EuipoTermSchema], default: [] },
     totalTerms: { type: Number, default: 0 },
     syncedAt: { type: Date, default: null },

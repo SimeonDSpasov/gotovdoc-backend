@@ -75,6 +75,10 @@ export default class Config {
   public euipoClientSecret = process.env.EUIPO_CLIENT_SECRET || '';
   public euipoBaseUrl = process.env.EUIPO_BASE_URL || 'https://api-sandbox.euipo.europa.eu/goods-and-services';
   public euipoTokenUrl = process.env.EUIPO_TOKEN_URL || 'https://auth-sandbox.euipo.europa.eu/oidc/accessToken';
+  /** When true, fetch a new token for every API request (debug only). */
+  public euipoTokenPerRequest = process.env.EUIPO_TOKEN_PER_REQUEST === 'true';
+  /** When true, send X-Debug / Accept-Debug headers (off by default — IBM gateway may 401 with them). */
+  public euipoDebugHeaders = process.env.EUIPO_DEBUG_HEADERS === 'true';
 
   private static instance: Config;
 

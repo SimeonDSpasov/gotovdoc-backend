@@ -42,7 +42,15 @@ const upload = multer({
 TrademarkRouter.post(
   '/create-order',
   useCatch(authMiddleware.attachUserIfPresent),
-  upload.array('files', 5),
+  upload.fields([
+    { name: 'markFile', maxCount: 1 },
+    { name: 'collectiveFile', maxCount: 1 },
+    { name: 'certifiedFile', maxCount: 1 },
+    { name: 'poaFiles', maxCount: 10 },
+    { name: 'conventionCertificateFiles', maxCount: 10 },
+    { name: 'exhibitionDocumentFiles', maxCount: 10 },
+    { name: 'additionalFiles', maxCount: 5 },
+  ]),
   useCatch(trademarkController.createOrder)
 );
 
@@ -69,6 +77,7 @@ TrademarkRouter.get(
 
 // EUIPO Goods & Services endpoints (public, no auth — served from DB)
 TrademarkRouter.get('/class-headings', useCatch(euipoController.getClassHeadings));
+TrademarkRouter.get('/class-descriptions', useCatch(euipoController.getClassDescriptions));
 TrademarkRouter.get('/search-terms', useCatch(euipoController.searchTerms));
 TrademarkRouter.get('/cache-stats', useCatch(euipoController.getCacheStats));
 
