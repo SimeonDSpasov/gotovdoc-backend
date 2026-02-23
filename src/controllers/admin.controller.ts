@@ -176,7 +176,7 @@ export default class AdminController {
                     documentsGenerated: true,
                 },
                 $push: {
-                    files: {
+                    finishedFiles: {
                         $each: uploadedFiles,
                     },
                 },

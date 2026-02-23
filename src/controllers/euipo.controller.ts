@@ -20,6 +20,35 @@ export default class EuipoController {
   }
 
   /**
+   * GET /api/trademark/class-terms?classNumber=5&page=0&size=100
+   * Returns paginated terms for a single class (no search filter).
+   */
+  public getClassTerms: RequestHandler = async (req, res) => {
+    const { classNumber, page, size } = req.query;
+
+    if (!classNumber) {
+      throw new CustomError(400, 'Query parameter "classNumber" is required');
+    }
+
+    const classNum = parseInt(classNumber as string, 10);
+
+    if (isNaN(classNum) || classNum < 1 || classNum > 45) {
+      throw new CustomError(400, 'classNumber must be between 1 and 45');
+    }
+
+    const pageNum = parseInt(page as string, 10) || 0;
+    const sizeNum = parseInt(size as string, 10) || 100;
+
+    const data = await this.euipoService.getClassTerms(
+      classNum,
+      pageNum,
+      Math.min(sizeNum, 100),
+    );
+
+    res.status(200).json({ success: true, data });
+  }
+
+  /**
    * GET /api/trademark/search-terms?classNumber=9&termText=da&page=0&size=15
    * Searches cached terms in MongoDB. classNumber can be comma-separated (e.g. "1,9,42").
    */

@@ -110,6 +110,54 @@ export default class EuipoCacheDataLayer {
     }
   }
 
+  public async getClassTerms(
+    classNumber: number,
+    page: number,
+    size: number,
+    logContext: string,
+  ): Promise<TermSearchResult> {
+    logContext = `${logContext} -> ${this.logContext} -> getClassTerms()`;
+
+    try {
+      const pipeline: any[] = [
+        { $match: { classNumber } },
+        { $unwind: '$terms' },
+        {
+          $facet: {
+            metadata: [{ $count: 'total' }],
+            data: [
+              { $skip: page * size },
+              { $limit: size },
+              {
+                $project: {
+                  _id: 0,
+                  text: '$terms.text',
+                  conceptId: '$terms.conceptId',
+                  taxonomyParentId: '$terms.taxonomyParentId',
+                  classNumber: '$classNumber',
+                },
+              },
+            ],
+          },
+        },
+      ];
+
+      const [result] = await EuipoClass.aggregate(pipeline);
+
+      const totalElements = result.metadata[0]?.total || 0;
+
+      return {
+        terms: result.data,
+        totalElements,
+        page,
+        size,
+      };
+    } catch (err: any) {
+      logger.error(`${err.message} -> classNumber: ${classNumber}`, logContext);
+      return { terms: [], totalElements: 0, page, size };
+    }
+  }
+
   public async searchTerms(
     termText: string,
     classNumbers: number[] | undefined,

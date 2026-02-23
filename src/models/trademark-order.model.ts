@@ -26,7 +26,8 @@ interface IFileRef {
 
 export interface ITrademarkOrder {
   orderId: string;
-  status: 'pending' | 'paid' | 'processing' | 'submitted_to_bpo' | 'published' | 'registered' | 'rejected' | 'cancelled';
+  status: 'draft' | 'pending' | 'paid' | 'processing' | 'submitted_to_bpo' | 'published' | 'registered' | 'rejected' | 'cancelled';
+  lastStep?: number;
 
   customerData: {
     email: string;
@@ -78,6 +79,8 @@ export interface ITrademarkOrder {
     euConversion?: {
       euTrademarkNumber: string;
       manualEntry: boolean;
+      applicationDate?: string;
+      priorityDate?: string;
     };
   };
 
@@ -120,6 +123,7 @@ export interface ITrademarkOrder {
 
   documentId?: mongoose.Types.ObjectId;
   userId?: mongoose.Types.ObjectId;
+  claimToken?: string;
 
   // Categorized file references
   markFile?: IFileRef;
@@ -160,17 +164,21 @@ const TrademarkOrderSchema: Schema = new Schema(
     },
     status: {
       type: String,
-      enum: ['pending', 'paid', 'processing', 'submitted_to_bpo', 'published', 'registered', 'rejected', 'cancelled'],
+      enum: ['draft', 'pending', 'paid', 'processing', 'submitted_to_bpo', 'published', 'registered', 'rejected', 'cancelled'],
       default: 'pending',
       index: true,
+    },
+    lastStep: {
+      type: Number,
+      required: false,
     },
 
     // ── Customer Data ──
     customerData: {
-      email: { type: String, required: true },
-      firstName: { type: String, required: true },
-      lastName: { type: String, required: true },
-      phone: { type: String, required: true },
+      email: { type: String },
+      firstName: { type: String },
+      lastName: { type: String },
+      phone: { type: String },
       address: String,
       city: String,
       postalCode: String,
@@ -187,7 +195,6 @@ const TrademarkOrderSchema: Schema = new Schema(
         type: String,
         enum: ['word', 'figurative', 'combined', '3d', 'color', 'sound',
                'hologram', 'position', 'pattern', 'motion', 'multimedia', 'other'],
-        required: true,
       },
       markText: String,
       markImageFileId: {
@@ -200,11 +207,7 @@ const TrademarkOrderSchema: Schema = new Schema(
       goodsAndServices: { type: String, default: '' },
       niceClasses: {
         type: [Number],
-        required: true,
-        validate: {
-          validator: (v: number[]) => v.length > 0,
-          message: 'At least one Nice class is required',
-        },
+        default: [],
       },
       customTerms: { type: Schema.Types.Mixed, default: {} },
       selectedTerms: { type: Schema.Types.Mixed, default: {} },
@@ -232,16 +235,18 @@ const TrademarkOrderSchema: Schema = new Schema(
       euConversion: {
         euTrademarkNumber: String,
         manualEntry: { type: Boolean, default: false },
+        applicationDate: String,
+        priorityDate: String,
       },
     },
 
     // ── Correspondence Address ──
     correspondenceAddress: {
-      fullName: { type: String, required: true },
-      streetAddress: { type: String, required: true },
-      city: { type: String, required: true },
-      postalCode: { type: String, required: true },
-      country: { type: String, required: true },
+      fullName: { type: String },
+      streetAddress: { type: String },
+      city: { type: String },
+      postalCode: { type: String },
+      country: { type: String },
     },
 
     // ── Power of Attorney ──
@@ -275,10 +280,10 @@ const TrademarkOrderSchema: Schema = new Schema(
       receiptUrl: String,
     },
     pricing: {
-      subtotal: { type: Number, required: true },
-      vat: { type: Number, required: true },
-      total: { type: Number, required: true },
-      currency: { type: String, required: true, default: 'EUR' },
+      subtotal: { type: Number, default: 0 },
+      vat: { type: Number, default: 0 },
+      total: { type: Number, default: 0 },
+      currency: { type: String, default: 'EUR' },
     },
 
     documentId: {
@@ -291,6 +296,11 @@ const TrademarkOrderSchema: Schema = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: false,
+    },
+    claimToken: {
+      type: String,
+      required: false,
+      index: true,
     },
 
     // ── Categorized Files ──

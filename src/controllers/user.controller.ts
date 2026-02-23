@@ -1,5 +1,7 @@
 import { RequestHandler } from 'express';
 import mongoose from 'mongoose';
+import fs from 'fs';
+import path from 'path';
 
 import CustomError from './../utils/custom-error.utils';
 
@@ -58,6 +60,42 @@ export default class UserController {
     res.status(200).json({
       data: order,
     });
+  }
+
+  public downloadOrderFile: RequestHandler = async (req, res) => {
+    const user = req.user;
+    const { orderId, fileIndex } = req.params;
+    const logContext = `${this.logContext} -> downloadOrderFile()`;
+
+    if (!orderId || fileIndex === undefined) {
+      throw new CustomError(400, 'Order ID and file index are required');
+    }
+
+    const order = mongoose.isValidObjectId(orderId)
+      ? await this.orderDataLayer.getById(orderId, logContext)
+      : await this.orderDataLayer.getByOrderId(orderId, logContext);
+
+    if (!order.userId || order.userId.toString() !== user._id.toString()) {
+      throw new CustomError(403, 'Forbidden');
+    }
+
+    const files = order.finishedFiles || [];
+    const idx = parseInt(fileIndex, 10);
+
+    if (isNaN(idx) || idx < 0 || idx >= files.length) {
+      throw new CustomError(404, 'File not found');
+    }
+
+    const file = files[idx];
+    const filePath = path.resolve(file.path);
+
+    if (!fs.existsSync(filePath)) {
+      throw new CustomError(404, 'File not found on disk');
+    }
+
+    res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${file.originalName || file.filename}"`);
+    fs.createReadStream(filePath).pipe(res);
   }
 
   public getActivity: RequestHandler = async (req, res) => {

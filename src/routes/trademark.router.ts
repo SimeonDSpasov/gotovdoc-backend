@@ -54,6 +54,55 @@ TrademarkRouter.post(
   useCatch(trademarkController.createOrder)
 );
 
+// Draft management (authenticated)
+const multerFields = [
+  { name: 'markFile', maxCount: 1 },
+  { name: 'collectiveFile', maxCount: 1 },
+  { name: 'certifiedFile', maxCount: 1 },
+  { name: 'poaFiles', maxCount: 10 },
+  { name: 'conventionCertificateFiles', maxCount: 10 },
+  { name: 'exhibitionDocumentFiles', maxCount: 10 },
+  { name: 'additionalFiles', maxCount: 5 },
+];
+
+TrademarkRouter.post(
+  '/save-draft',
+  useCatch(authMiddleware.attachUserIfPresent),
+  upload.fields(multerFields),
+  useCatch(trademarkController.saveDraft)
+);
+
+TrademarkRouter.get(
+  '/drafts',
+  useCatch(authMiddleware.isAuthenticated),
+  useCatch(trademarkController.getUserDrafts)
+);
+
+TrademarkRouter.post(
+  '/drafts/claim',
+  useCatch(authMiddleware.isAuthenticated),
+  useCatch(trademarkController.claimDraft)
+);
+
+TrademarkRouter.get(
+  '/drafts/:orderId',
+  useCatch(authMiddleware.isAuthenticated),
+  useCatch(trademarkController.getDraft)
+);
+
+TrademarkRouter.put(
+  '/drafts/:orderId',
+  useCatch(authMiddleware.isAuthenticated),
+  upload.fields(multerFields),
+  useCatch(trademarkController.updateDraft)
+);
+
+TrademarkRouter.delete(
+  '/drafts/:orderId',
+  useCatch(authMiddleware.isAuthenticated),
+  useCatch(trademarkController.deleteDraft)
+);
+
 // Get user's trademark orders (authenticated)
 TrademarkRouter.get(
   '/orders',
@@ -68,6 +117,13 @@ TrademarkRouter.get(
   useCatch(trademarkController.getOrder)
 );
 
+// Revert pending order back to draft (guest + auth)
+TrademarkRouter.put(
+  '/orders/:orderId/revert-to-draft',
+  useCatch(authMiddleware.attachUserIfPresent),
+  useCatch(trademarkController.revertToDraft)
+);
+
 // Download power of attorney (guest with email or auth)
 TrademarkRouter.get(
   '/power-of-attorney/:orderId',
@@ -77,6 +133,7 @@ TrademarkRouter.get(
 
 // EUIPO Goods & Services endpoints (public, no auth — served from DB)
 TrademarkRouter.get('/class-headings', useCatch(euipoController.getClassHeadings));
+TrademarkRouter.get('/class-terms', useCatch(euipoController.getClassTerms));
 TrademarkRouter.get('/class-descriptions', useCatch(euipoController.getClassDescriptions));
 TrademarkRouter.get('/search-terms', useCatch(euipoController.searchTerms));
 TrademarkRouter.get('/cache-stats', useCatch(euipoController.getCacheStats));

@@ -6,6 +6,7 @@ import CapitalRevaluationRouter from './capital-revaluation.router';
 import DocumentRouter from './document.router';
 import EmailRouter from './email.router';
 import StripeRouter from './stripe.router';
+import PropertySearchRouter from './property-search.router';
 import TrademarkRouter from './trademark.router';
 import UserRouter from './user.router';
 
@@ -25,6 +26,8 @@ MainRouter.use('/api/stripe', StripeRouter);
 MainRouter.use('/api/capital-revaluation', CapitalRevaluationRouter);
 
 MainRouter.use('/api/trademark', TrademarkRouter);
+
+MainRouter.use('/api/property-search', PropertySearchRouter);
 
 MainRouter.use('/api/admin', AdminRouter);
 

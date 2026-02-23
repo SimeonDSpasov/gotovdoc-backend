@@ -128,6 +128,12 @@ export function validateTrademarkData(data: any): void {
     if (!data.euConversion.euTrademarkNumber) {
       throw new CustomError(400, 'euTrademarkNumber is required when EU conversion is enabled');
     }
+    if (data.euConversion.applicationDate && !/^\d{4}-\d{2}-\d{2}$/.test(data.euConversion.applicationDate)) {
+      throw new CustomError(400, 'EU conversion applicationDate must be in YYYY-MM-DD format');
+    }
+    if (data.euConversion.priorityDate && !/^\d{4}-\d{2}-\d{2}$/.test(data.euConversion.priorityDate)) {
+      throw new CustomError(400, 'EU conversion priorityDate must be in YYYY-MM-DD format');
+    }
   }
 
   // International transformation validation
@@ -178,5 +184,42 @@ export function validatePowerOfAttorneyData(data: any): void {
   }
   if (!data.city) {
     throw new CustomError(400, 'POA: city is required');
+  }
+}
+
+// ── Draft Validation ──
+
+/**
+ * Relaxed validation for drafts — only validates fields that are present.
+ * No required fields except that the request is authenticated.
+ * Sanitizes mark type and nice classes if they're provided.
+ */
+export function validateTrademarkDraft(data: {
+  customerData?: any;
+  trademarkData?: any;
+  correspondenceAddress?: any;
+  powerOfAttorneyData?: any;
+}): void {
+  // Validate mark type if present
+  if (data.trademarkData?.markType && !isValidMarkType(data.trademarkData.markType)) {
+    throw new CustomError(400, `Invalid markType. Must be one of: ${VALID_MARK_TYPES.join(', ')}`);
+  }
+
+  // Validate nice classes if present
+  if (data.trademarkData?.niceClasses && Array.isArray(data.trademarkData.niceClasses)) {
+    const classes = data.trademarkData.niceClasses.map(Number).filter((n: number) => !isNaN(n));
+    if (classes.length > 0 && !classes.every((c: number) => Number.isInteger(c) && c >= 1 && c <= 45)) {
+      throw new CustomError(400, 'niceClasses must contain integers between 1 and 45');
+    }
+  }
+
+  // Validate email if present
+  if (data.customerData?.email && !isValidEmail(data.customerData.email)) {
+    throw new CustomError(400, 'Invalid email address');
+  }
+
+  // Validate phone if present
+  if (data.customerData?.phone && !isValidPhone(data.customerData.phone)) {
+    throw new CustomError(400, 'Invalid phone number');
   }
 }

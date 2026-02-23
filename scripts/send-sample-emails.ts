@@ -1,4 +1,4 @@
-import { EmailType, EmailUtil } from '../src/utils/email.util';
+import { EmailType, EmailUtil } from './../src/utils/email.util';
 
 const recipientEmail = 'thegamefan36@gmail.com';
 

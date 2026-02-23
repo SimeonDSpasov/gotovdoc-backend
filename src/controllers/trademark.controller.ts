@@ -19,6 +19,7 @@ import {
   validateTrademarkData,
   validateCorrespondenceAddress,
   validatePowerOfAttorneyData,
+  validateTrademarkDraft,
 } from './../utils/trademark-validation.util';
 import { calculateTrademarkPrice } from './../config/trademark-pricing.config';
 
@@ -196,6 +197,8 @@ export default class TrademarkController {
         euConversion: trademarkData.euConversion ? {
           euTrademarkNumber: trademarkData.euConversion.euTrademarkNumber,
           manualEntry: trademarkData.euConversion.manualEntry === true || trademarkData.euConversion.manualEntry === 'true',
+          applicationDate: trademarkData.euConversion.applicationDate || undefined,
+          priorityDate: trademarkData.euConversion.priorityDate || undefined,
         } : undefined,
       },
 
@@ -366,6 +369,384 @@ export default class TrademarkController {
       success: true,
       data: orders,
     });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // DRAFT ENDPOINTS
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * POST /api/trademark/save-draft
+   * Authenticated — save a partial trademark order as draft
+   */
+  public saveDraft: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> saveDraft()`;
+
+    // Parse optional JSON fields
+    const customerData = req.body.customerData
+      ? sanitizeObject(parseJsonField<any>(req.body.customerData, 'customerData'))
+      : undefined;
+    const trademarkData = req.body.trademarkData
+      ? sanitizeObject(parseJsonField<any>(req.body.trademarkData, 'trademarkData'))
+      : undefined;
+    const correspondenceAddress = req.body.correspondenceAddress
+      ? sanitizeObject(parseJsonField<any>(req.body.correspondenceAddress, 'correspondenceAddress'))
+      : undefined;
+    const powerOfAttorneyData = req.body.powerOfAttorneyData
+      ? sanitizeObject(parseJsonField<any>(req.body.powerOfAttorneyData, 'powerOfAttorneyData'))
+      : undefined;
+
+    const powerOfAttorneyDelivery = req.body.powerOfAttorneyDelivery || undefined;
+    const deliveryMethod = req.body.deliveryMethod || undefined;
+    const lastStep = parseInt(req.body.lastStep, 10) || 1;
+
+    // Relaxed validation
+    validateTrademarkDraft({ customerData, trademarkData, correspondenceAddress, powerOfAttorneyData });
+
+    // Upload files (reuse same pattern as createOrder)
+    const filesMap = (req.files || {}) as Record<string, Express.Multer.File[]>;
+    const uploadCategoryFiles = async (fieldName: string, maxCount: number) => {
+      const files = filesMap[fieldName] || [];
+      if (files.length > maxCount) {
+        throw new CustomError(400, `Too many files for ${fieldName}. Max: ${maxCount}`);
+      }
+      const refs = [];
+      for (const file of files) {
+        const fileStream = fs.createReadStream(file.path);
+        const fileId = await this.fileStorageUtil.uploadFile(fileStream, file.originalname, file.mimetype);
+        refs.push({ fileId, filename: file.originalname, mimetype: file.mimetype, size: file.size });
+        fs.unlinkSync(file.path);
+      }
+      return refs;
+    };
+
+    const markFileRefs = await uploadCategoryFiles('markFile', 1);
+    const collectiveFileRefs = await uploadCategoryFiles('collectiveFile', 1);
+    const certifiedFileRefs = await uploadCategoryFiles('certifiedFile', 1);
+    const poaFileRefs = await uploadCategoryFiles('poaFiles', 10);
+    const conventionCertificateFileRefs = await uploadCategoryFiles('conventionCertificateFiles', 10);
+    const exhibitionDocumentFileRefs = await uploadCategoryFiles('exhibitionDocumentFiles', 10);
+    const additionalFileRefs = await uploadCategoryFiles('additionalFiles', 5);
+
+    // Calculate pricing if enough data
+    let pricing = { subtotal: 0, vat: 0, total: 0, currency: 'EUR' };
+    if (trademarkData?.niceClasses?.length > 0) {
+      const niceClasses = trademarkData.niceClasses.map(Number).filter((n: number) => !isNaN(n));
+      const isCollective = trademarkData.isCollective === true || trademarkData.isCollective === 'true';
+      const isCertified = trademarkData.isCertified === true || trademarkData.isCertified === 'true';
+      const claimCount = (trademarkData.priorityClaims?.length || 0) + (trademarkData.exhibitionPriorities?.length || 0);
+      pricing = calculateTrademarkPrice({ niceClassCount: niceClasses.length, priorityClaimCount: claimCount, isCollective, isCertified });
+    }
+
+    const orderId = `TM-DRAFT-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+    const orderPayload: any = {
+      orderId,
+      status: 'draft',
+      lastStep,
+      pricing,
+    };
+
+    if (req.user?._id) {
+      orderPayload.userId = req.user._id;
+    } else {
+      orderPayload.claimToken = crypto.randomBytes(32).toString('hex');
+    }
+
+    if (customerData) orderPayload.customerData = customerData;
+    if (trademarkData) {
+      orderPayload.trademarkData = {
+        ...trademarkData,
+        niceClasses: trademarkData.niceClasses?.map(Number).filter((n: number) => !isNaN(n)) || [],
+        markImageFileId: markFileRefs.length > 0 ? markFileRefs[0].fileId : undefined,
+      };
+    }
+    if (correspondenceAddress) orderPayload.correspondenceAddress = correspondenceAddress;
+    if (powerOfAttorneyData) orderPayload.powerOfAttorneyData = powerOfAttorneyData;
+    if (powerOfAttorneyDelivery) orderPayload.powerOfAttorneyDelivery = powerOfAttorneyDelivery;
+    if (deliveryMethod) orderPayload.deliveryMethod = deliveryMethod;
+
+    // Files
+    if (markFileRefs[0]) orderPayload.markFile = markFileRefs[0];
+    if (collectiveFileRefs[0]) orderPayload.collectiveFile = collectiveFileRefs[0];
+    if (certifiedFileRefs[0]) orderPayload.certifiedFile = certifiedFileRefs[0];
+    if (poaFileRefs.length) orderPayload.poaFiles = poaFileRefs;
+    if (conventionCertificateFileRefs.length) orderPayload.conventionCertificateFiles = conventionCertificateFileRefs;
+    if (exhibitionDocumentFileRefs.length) orderPayload.exhibitionDocumentFiles = exhibitionDocumentFileRefs;
+    if (additionalFileRefs.length) orderPayload.additionalFiles = additionalFileRefs;
+
+    const order = await this.trademarkOrderDataLayer.create(orderPayload, logContext);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        orderId: order.orderId,
+        status: order.status,
+        ...(order.claimToken ? { claimToken: order.claimToken } : {}),
+      },
+    });
+  }
+
+  /**
+   * POST /api/trademark/drafts/claim
+   * Authenticated — claim a guest-created draft using a claimToken
+   */
+  public claimDraft: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> claimDraft()`;
+
+    if (!req.user?._id) {
+      throw new CustomError(401, 'Authentication required to claim a draft');
+    }
+
+    const { claimToken } = req.body;
+
+    if (!claimToken || typeof claimToken !== 'string') {
+      throw new CustomError(400, 'claimToken is required');
+    }
+
+    const draft = await this.trademarkOrderDataLayer.get(
+      { claimToken, status: 'draft', $or: [{ userId: { $exists: false } }, { userId: null }] },
+      logContext,
+    );
+
+    if (!draft) {
+      throw new CustomError(404, 'No unclaimed draft found for this token');
+    }
+
+    if (draft.userId) {
+      throw new CustomError(400, 'This draft has already been claimed');
+    }
+
+    const updated = await this.trademarkOrderDataLayer.updateByOrderId(
+      draft.orderId,
+      { userId: req.user._id, $unset: { claimToken: 1 } },
+      logContext,
+    );
+
+    res.status(200).json({
+      success: true,
+      data: { orderId: updated.orderId, status: updated.status },
+    });
+  }
+
+  /**
+   * PUT /api/trademark/drafts/:orderId
+   * Authenticated — update an existing draft
+   */
+  public updateDraft: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> updateDraft()`;
+
+    if (!req.user?._id) {
+      throw new CustomError(401, 'Authentication required');
+    }
+
+    const { orderId } = req.params;
+    const existing = await this.trademarkOrderDataLayer.getByOrderId(orderId, logContext);
+
+    if (existing.status !== 'draft') {
+      throw new CustomError(400, 'Only draft orders can be updated via this endpoint');
+    }
+    if (!existing.userId || existing.userId.toString() !== req.user._id.toString()) {
+      throw new CustomError(403, 'Access denied');
+    }
+
+    // Parse optional JSON fields
+    const customerData = req.body.customerData
+      ? sanitizeObject(parseJsonField<any>(req.body.customerData, 'customerData'))
+      : undefined;
+    const trademarkData = req.body.trademarkData
+      ? sanitizeObject(parseJsonField<any>(req.body.trademarkData, 'trademarkData'))
+      : undefined;
+    const correspondenceAddress = req.body.correspondenceAddress
+      ? sanitizeObject(parseJsonField<any>(req.body.correspondenceAddress, 'correspondenceAddress'))
+      : undefined;
+    const powerOfAttorneyData = req.body.powerOfAttorneyData
+      ? sanitizeObject(parseJsonField<any>(req.body.powerOfAttorneyData, 'powerOfAttorneyData'))
+      : undefined;
+
+    validateTrademarkDraft({ customerData, trademarkData, correspondenceAddress, powerOfAttorneyData });
+
+    const lastStep = parseInt(req.body.lastStep, 10) || existing.lastStep || 1;
+
+    // Upload new files
+    const filesMap = (req.files || {}) as Record<string, Express.Multer.File[]>;
+    const uploadCategoryFiles = async (fieldName: string, maxCount: number) => {
+      const files = filesMap[fieldName] || [];
+      if (files.length > maxCount) throw new CustomError(400, `Too many files for ${fieldName}`);
+      const refs = [];
+      for (const file of files) {
+        const fileStream = fs.createReadStream(file.path);
+        const fileId = await this.fileStorageUtil.uploadFile(fileStream, file.originalname, file.mimetype);
+        refs.push({ fileId, filename: file.originalname, mimetype: file.mimetype, size: file.size });
+        fs.unlinkSync(file.path);
+      }
+      return refs;
+    };
+
+    const markFileRefs = await uploadCategoryFiles('markFile', 1);
+    const collectiveFileRefs = await uploadCategoryFiles('collectiveFile', 1);
+    const certifiedFileRefs = await uploadCategoryFiles('certifiedFile', 1);
+    const poaFileRefs = await uploadCategoryFiles('poaFiles', 10);
+    const conventionCertificateFileRefs = await uploadCategoryFiles('conventionCertificateFiles', 10);
+    const exhibitionDocumentFileRefs = await uploadCategoryFiles('exhibitionDocumentFiles', 10);
+    const additionalFileRefs = await uploadCategoryFiles('additionalFiles', 5);
+
+    const update: any = { lastStep };
+
+    if (customerData) update.customerData = customerData;
+    if (trademarkData) {
+      update.trademarkData = {
+        ...trademarkData,
+        niceClasses: trademarkData.niceClasses?.map(Number).filter((n: number) => !isNaN(n)) || [],
+        markImageFileId: markFileRefs.length > 0 ? markFileRefs[0].fileId : (existing.trademarkData as any)?.markImageFileId,
+      };
+    }
+    if (correspondenceAddress) update.correspondenceAddress = correspondenceAddress;
+    if (powerOfAttorneyData) update.powerOfAttorneyData = powerOfAttorneyData;
+    if (req.body.powerOfAttorneyDelivery) update.powerOfAttorneyDelivery = req.body.powerOfAttorneyDelivery;
+    if (req.body.deliveryMethod) update.deliveryMethod = req.body.deliveryMethod;
+
+    // Files: replace if new ones uploaded
+    if (markFileRefs[0]) update.markFile = markFileRefs[0];
+    if (collectiveFileRefs[0]) update.collectiveFile = collectiveFileRefs[0];
+    if (certifiedFileRefs[0]) update.certifiedFile = certifiedFileRefs[0];
+    if (poaFileRefs.length) update.poaFiles = poaFileRefs;
+    if (conventionCertificateFileRefs.length) update.conventionCertificateFiles = conventionCertificateFileRefs;
+    if (exhibitionDocumentFileRefs.length) update.exhibitionDocumentFiles = exhibitionDocumentFileRefs;
+    if (additionalFileRefs.length) update.additionalFiles = additionalFileRefs;
+
+    // Recalculate pricing
+    const td = trademarkData || existing.trademarkData;
+    const niceClasses = (td?.niceClasses || []).map(Number).filter((n: number) => !isNaN(n));
+    if (niceClasses.length > 0) {
+      const isCollective = td?.isCollective === true || td?.isCollective === 'true';
+      const isCertified = td?.isCertified === true || td?.isCertified === 'true';
+      const claimCount = (td?.priorityClaims?.length || 0) + (td?.exhibitionPriorities?.length || 0);
+      update.pricing = calculateTrademarkPrice({ niceClassCount: niceClasses.length, priorityClaimCount: claimCount, isCollective, isCertified });
+    }
+
+    const updated = await this.trademarkOrderDataLayer.updateByOrderId(orderId, update, logContext);
+
+    res.status(200).json({ success: true, data: updated });
+  }
+
+  /**
+   * GET /api/trademark/drafts/:orderId
+   * Authenticated — get a single draft
+   */
+  public getDraft: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> getDraft()`;
+
+    if (!req.user?._id) {
+      throw new CustomError(401, 'Authentication required');
+    }
+
+    const { orderId } = req.params;
+    const order = await this.trademarkOrderDataLayer.getByOrderId(orderId, logContext);
+
+    if (!order.userId || order.userId.toString() !== req.user._id.toString()) {
+      throw new CustomError(403, 'Access denied');
+    }
+
+    res.status(200).json({ success: true, data: order });
+  }
+
+  /**
+   * DELETE /api/trademark/drafts/:orderId
+   * Authenticated — delete a draft and its files
+   */
+  public deleteDraft: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> deleteDraft()`;
+
+    if (!req.user?._id) {
+      throw new CustomError(401, 'Authentication required');
+    }
+
+    const { orderId } = req.params;
+    const order = await this.trademarkOrderDataLayer.getByOrderId(orderId, logContext);
+
+    if (order.status !== 'draft') {
+      throw new CustomError(400, 'Only draft orders can be deleted');
+    }
+    if (!order.userId || order.userId.toString() !== req.user._id.toString()) {
+      throw new CustomError(403, 'Access denied');
+    }
+
+    // Delete GridFS files
+    const fileIds: any[] = [];
+    if (order.markFile) fileIds.push(order.markFile.fileId);
+    if (order.collectiveFile) fileIds.push(order.collectiveFile.fileId);
+    if (order.certifiedFile) fileIds.push(order.certifiedFile.fileId);
+    (order.poaFiles || []).forEach((f: any) => fileIds.push(f.fileId));
+    (order.conventionCertificateFiles || []).forEach((f: any) => fileIds.push(f.fileId));
+    (order.exhibitionDocumentFiles || []).forEach((f: any) => fileIds.push(f.fileId));
+    (order.additionalFiles || []).forEach((f: any) => fileIds.push(f.fileId));
+
+    for (const fileId of fileIds) {
+      await this.fileStorageUtil.deleteFile(fileId).catch(() => {});
+    }
+
+    await this.trademarkOrderDataLayer.deleteMany({ orderId }, logContext);
+
+    res.status(200).json({ success: true });
+  }
+
+  /**
+   * PUT /api/trademark/orders/:orderId/revert-to-draft
+   * Guest + Auth — revert a pending order back to draft status
+   */
+  public revertToDraft: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> revertToDraft()`;
+    const { orderId } = req.params;
+
+    const order = await this.trademarkOrderDataLayer.getByOrderId(orderId, logContext);
+
+    if (order.status !== 'pending') {
+      throw new CustomError(400, 'Only pending orders can be reverted to draft');
+    }
+
+    // Verify ownership: must be order creator (by userId) or allow guest revert
+    if (order.userId && req.user?._id && order.userId.toString() !== req.user._id.toString()) {
+      throw new CustomError(403, 'Access denied');
+    }
+
+    const update: any = { status: 'draft' };
+
+    if (req.user?._id) {
+      update.userId = req.user._id;
+    } else {
+      update.claimToken = crypto.randomBytes(32).toString('hex');
+    }
+
+    const updated = await this.trademarkOrderDataLayer.updateByOrderId(orderId, update, logContext);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        orderId: updated.orderId,
+        status: updated.status,
+        ...(updated.claimToken ? { claimToken: updated.claimToken } : {}),
+      },
+    });
+  }
+
+  /**
+   * GET /api/trademark/drafts
+   * Authenticated — list all user's drafts
+   */
+  public getUserDrafts: RequestHandler = async (req, res) => {
+    const logContext = `${this.logContext} -> getUserDrafts()`;
+
+    if (!req.user?._id) {
+      throw new CustomError(401, 'Authentication required');
+    }
+
+    const drafts = await this.trademarkOrderDataLayer.getAll(
+      { userId: req.user._id, status: 'draft' },
+      logContext,
+    );
+
+    res.status(200).json({ success: true, data: drafts });
   }
 
   /**

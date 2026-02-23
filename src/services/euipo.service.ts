@@ -54,6 +54,19 @@ export default class EuipoService {
     return this.cacheDataLayer.getAllClasses(`${this.logContext} -> getClassHeadings()`);
   }
 
+  public async getClassTerms(
+    classNumber: number,
+    page: number,
+    size: number,
+  ): Promise<unknown> {
+    return this.cacheDataLayer.getClassTerms(
+      classNumber,
+      page,
+      size,
+      `${this.logContext} -> getClassTerms()`,
+    );
+  }
+
   public async searchTerms(
     termText: string,
     classNumbers: number[] | undefined,
@@ -163,7 +176,7 @@ export default class EuipoService {
 
   private async fetchClassHeadingsFromApi(language: string): Promise<ClassHeadingsResponse> {
     return this.request<ClassHeadingsResponse>('GET', '/classHeadings', {
-      params: { language: 'es' },
+      params: { language: 'bg' },
     });
   }
 

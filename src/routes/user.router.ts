@@ -22,6 +22,9 @@ UserRouter.get('/orders', useCatch(authMiddleware.isAuthenticated), useCatch(use
 // Get current user order by orderId
 UserRouter.get('/orders/:orderId', useCatch(authMiddleware.isAuthenticated), useCatch(userController.getOrderById));
 
+// Download a finished file from an order
+UserRouter.get('/orders/:orderId/files/:fileIndex', useCatch(authMiddleware.isAuthenticated), useCatch(userController.downloadOrderFile));
+
 // Get current user activity
 UserRouter.get('/activity', useCatch(authMiddleware.isAuthenticated), useCatch(userController.getActivity));
 

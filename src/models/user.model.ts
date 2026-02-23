@@ -35,9 +35,10 @@ interface IUser {
 }
 
 interface IUserActivity {
-  type: 'document_generated' | 'document_downloaded' | 'trademark_order_created' | 'trademark_poa_downloaded';
+  type: 'document_generated' | 'document_downloaded' | 'trademark_order_created' | 'trademark_poa_downloaded' | 'order_created';
   documentId?: Types.ObjectId;
   orderId?: string;
+  orderType?: string;
   documentName?: string;
   createdAt: Date;
 }
