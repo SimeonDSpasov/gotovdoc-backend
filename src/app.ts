@@ -12,23 +12,23 @@ import { registerEuipoSyncCron } from './cronjobs/euipo-sync.cron';
 import EuipoService from './services/euipo.service';
 
 (async () => {
-  try {
-    new LoggerSetup();
+ try {
+  new LoggerSetup();
 
-    await ConnectionManager.getInstance().initConnections();
+  await ConnectionManager.getInstance().initConnections();
 
-    if (!process.env.WORKER_ID) {
-      process.env.WORKER_ID = `worker-${Math.floor(Math.random() * 10000)}`;
-    }
-
-    if (process.env.WORKER_ID === 'worker-1') {
-      registerOrderCleanupCron();
-      registerEuipoSyncCron();
-    }
-    
-    new AppServer();
-    new AppProcesses();
-  } catch (err: any) {
-    logger.error(err, 'App Init Error');
+  if (!process.env.WORKER_ID) {
+   process.env.WORKER_ID = `worker-${Math.floor(Math.random() * 10000)}`;
   }
+
+  if (process.env.WORKER_ID === 'worker-1') {
+   registerOrderCleanupCron();
+   registerEuipoSyncCron();
+  }
+  
+  new AppServer();
+  new AppProcesses();
+ } catch (err: any) {
+  logger.error(err, 'App Init Error');
+ }
 })();

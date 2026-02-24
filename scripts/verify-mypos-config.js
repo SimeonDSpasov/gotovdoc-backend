@@ -6,52 +6,52 @@ console.log('═'.repeat(70));
 
 // Check all required environment variables
 const requiredVars = {
-  'MYPOS_SID': process.env.MYPOS_SID,
-  'MYPOS_WALLET_NUMBER': process.env.MYPOS_WALLET_NUMBER,
-  'MYPOS_KEY_INDEX': process.env.MYPOS_KEY_INDEX,
-  'MYPOS_PRIVATE_KEY': process.env.MYPOS_PRIVATE_KEY ? '✓ Present' : '✗ Missing',
-  'MYPOS_PUBLIC_CERT': process.env.MYPOS_PUBLIC_CERT ? '✓ Present' : '✗ Missing',
+ 'MYPOS_SID': process.env.MYPOS_SID,
+ 'MYPOS_WALLET_NUMBER': process.env.MYPOS_WALLET_NUMBER,
+ 'MYPOS_KEY_INDEX': process.env.MYPOS_KEY_INDEX,
+ 'MYPOS_PRIVATE_KEY': process.env.MYPOS_PRIVATE_KEY ? '✓ Present' : '✗ Missing',
+ 'MYPOS_PUBLIC_CERT': process.env.MYPOS_PUBLIC_CERT ? '✓ Present' : '✗ Missing',
 };
 
 console.log('📋 Environment Variables:');
 for (const [key, value] of Object.entries(requiredVars)) {
-  console.log(`  ${key}: ${value}`);
+ console.log(`  ${key}: ${value}`);
 }
 
 console.log('\n═'.repeat(70));
 
 // Verify keys are valid
 if (process.env.MYPOS_PRIVATE_KEY && process.env.MYPOS_PUBLIC_CERT) {
-  try {
-    const privateKey = process.env.MYPOS_PRIVATE_KEY;
-    const publicCert = process.env.MYPOS_PUBLIC_CERT;
-    
-    // Test signature generation
-    const testData = 'test123';
-    const sign = crypto.createSign('SHA1');
-    sign.update(testData);
-    sign.end();
-    const signature = sign.sign(privateKey, 'base64');
-    
-    // Test signature verification
-    const verify = crypto.createVerify('SHA1');
-    verify.update(testData);
-    verify.end();
-    const isValid = verify.verify(publicCert, signature, 'base64');
-    
-    console.log('\n🔐 Key Pair Test:');
-    console.log(`  Signature Generation: ✓ Success`);
-    console.log(`  Signature Verification: ${isValid ? '✓ Valid' : '✗ Invalid'}`);
-    
-    if (!isValid) {
-      console.log('\n❌ ERROR: Your private key and public certificate DO NOT MATCH!');
-      console.log('   This will cause signature failures with myPOS.');
-    } else {
-      console.log('\n✅ Keys are valid and match!');
-    }
-  } catch (error) {
-    console.log('\n❌ ERROR testing keys:', error.message);
+ try {
+  const privateKey = process.env.MYPOS_PRIVATE_KEY;
+  const publicCert = process.env.MYPOS_PUBLIC_CERT;
+  
+  // Test signature generation
+  const testData = 'test123';
+  const sign = crypto.createSign('SHA1');
+  sign.update(testData);
+  sign.end();
+  const signature = sign.sign(privateKey, 'base64');
+  
+  // Test signature verification
+  const verify = crypto.createVerify('SHA1');
+  verify.update(testData);
+  verify.end();
+  const isValid = verify.verify(publicCert, signature, 'base64');
+  
+  console.log('\n🔐 Key Pair Test:');
+  console.log(`  Signature Generation: ✓ Success`);
+  console.log(`  Signature Verification: ${isValid ? '✓ Valid' : '✗ Invalid'}`);
+  
+  if (!isValid) {
+   console.log('\n❌ ERROR: Your private key and public certificate DO NOT MATCH!');
+   console.log('   This will cause signature failures with myPOS.');
+  } else {
+   console.log('\n✅ Keys are valid and match!');
   }
+ } catch (error) {
+  console.log('\n❌ ERROR testing keys:', error.message);
+ }
 }
 
 console.log('\n═'.repeat(70));

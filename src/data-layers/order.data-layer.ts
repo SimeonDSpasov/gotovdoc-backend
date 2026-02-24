@@ -6,167 +6,167 @@ import { Order, OrderDoc, IOrder } from './../models/order.model';
 
 export default class OrderDataLayer {
 
-  private logContext = 'Order Data Layer';
+ private logContext = 'Order Data Layer';
 
-  public async create(data: Partial<IOrder>, logContext: string): Promise<OrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> create()`;
+ public async create(data: Partial<IOrder>, logContext: string): Promise<OrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> create()`;
 
-    const order = await Order.create(data)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> data: ${JSON.stringify(data)}`);
-      });
+  const order = await Order.create(data)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> data: ${JSON.stringify(data)}`);
+   });
 
-    return order;
+  return order;
+ }
+
+ public async get(filter: FilterQuery<IOrder>, logContext: string): Promise<OrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> get()`;
+
+  const order = await Order.findOne(filter)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
+   });
+
+  if (!order) {
+   throw new CustomError(404, `No order found`);
   }
 
-  public async get(filter: FilterQuery<IOrder>, logContext: string): Promise<OrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> get()`;
+  return order;
+ }
 
-    const order = await Order.findOne(filter)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
-      });
+ public async getById(id: string | mongoose.Types.ObjectId, logContext: string): Promise<OrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> getById()`;
 
-    if (!order) {
-      throw new CustomError(404, `No order found`);
-    }
-
-    return order;
+  if (!mongoose.isValidObjectId(id)) {
+   throw new CustomError(400, `Invalid ID`);
   }
 
-  public async getById(id: string | mongoose.Types.ObjectId, logContext: string): Promise<OrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> getById()`;
+  const order = await Order.findById(id)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> id: ${id.toString()}`);
+   });
 
-    if (!mongoose.isValidObjectId(id)) {
-      throw new CustomError(400, `Invalid ID`);
-    }
-
-    const order = await Order.findById(id)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> id: ${id.toString()}`);
-      });
-
-    if (!order) {
-      throw new CustomError(404, `No order found`);
-    }
-
-    return order;
+  if (!order) {
+   throw new CustomError(404, `No order found`);
   }
 
-  public async getByOrderId(orderId: string, logContext: string): Promise<OrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> getByOrderId()`;
+  return order;
+ }
 
-    const order = await Order.findOne({ orderId })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> orderId: ${orderId}`);
-      });
+ public async getByOrderId(orderId: string, logContext: string): Promise<OrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> getByOrderId()`;
 
-    if (!order) {
-      throw new CustomError(404, `No order found with orderId: ${orderId}`);
-    }
+  const order = await Order.findOne({ orderId })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> orderId: ${orderId}`);
+   });
 
-    return order;
+  if (!order) {
+   throw new CustomError(404, `No order found with orderId: ${orderId}`);
   }
 
-  public async getAll(filter: FilterQuery<IOrder>, logContext: string): Promise<OrderDoc[]> {
-    logContext = `${logContext} -> ${this.logContext} -> getAll()`;
+  return order;
+ }
 
-    const orders = await Order.find(filter)
-      .sort({ createdAt: -1 })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
-      });
+ public async getAll(filter: FilterQuery<IOrder>, logContext: string): Promise<OrderDoc[]> {
+  logContext = `${logContext} -> ${this.logContext} -> getAll()`;
 
-    return orders;
+  const orders = await Order.find(filter)
+   .sort({ createdAt: -1 })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
+   });
+
+  return orders;
+ }
+
+ public async getUserOrders(userId: string | mongoose.Types.ObjectId, logContext: string): Promise<OrderDoc[]> {
+  logContext = `${logContext} -> ${this.logContext} -> getUserOrders()`;
+
+  if (!mongoose.isValidObjectId(userId)) {
+   throw new CustomError(400, `Invalid user ID`);
   }
 
-  public async getUserOrders(userId: string | mongoose.Types.ObjectId, logContext: string): Promise<OrderDoc[]> {
-    logContext = `${logContext} -> ${this.logContext} -> getUserOrders()`;
+  const orders = await Order.find({ userId })
+   .sort({ createdAt: -1 })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> userId: ${userId.toString()}`);
+   });
 
-    if (!mongoose.isValidObjectId(userId)) {
-      throw new CustomError(400, `Invalid user ID`);
-    }
+  return orders;
+ }
 
-    const orders = await Order.find({ userId })
-      .sort({ createdAt: -1 })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> userId: ${userId.toString()}`);
-      });
+ public async update(id: string | mongoose.Types.ObjectId, update: UpdateQuery<IOrder>, logContext: string): Promise<OrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> update()`;
 
-    return orders;
+  if (!mongoose.isValidObjectId(id)) {
+   throw new CustomError(400, `Invalid ID`);
   }
 
-  public async update(id: string | mongoose.Types.ObjectId, update: UpdateQuery<IOrder>, logContext: string): Promise<OrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> update()`;
+  const order = await Order.findByIdAndUpdate(id, update, { new: true })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> findByIdAndUpdate() -> id: ${id.toString()} | update: ${JSON.stringify(update)}`);
+   });
 
-    if (!mongoose.isValidObjectId(id)) {
-      throw new CustomError(400, `Invalid ID`);
-    }
-
-    const order = await Order.findByIdAndUpdate(id, update, { new: true })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> findByIdAndUpdate() -> id: ${id.toString()} | update: ${JSON.stringify(update)}`);
-      });
-
-    if (!order) {
-      throw new CustomError(404, `No order found`);
-    }
-
-    return order;
+  if (!order) {
+   throw new CustomError(404, `No order found`);
   }
 
-  public async updateByOrderId(orderId: string, update: UpdateQuery<IOrder>, logContext: string): Promise<OrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> updateByOrderId()`;
+  return order;
+ }
 
-    const order = await Order.findOneAndUpdate({ orderId }, update, { new: true })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> findOneAndUpdate() -> orderId: ${orderId} | update: ${JSON.stringify(update)}`);
-      });
+ public async updateByOrderId(orderId: string, update: UpdateQuery<IOrder>, logContext: string): Promise<OrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> updateByOrderId()`;
 
-    if (!order) {
-      throw new CustomError(404, `No order found with orderId: ${orderId}`);
-    }
+  const order = await Order.findOneAndUpdate({ orderId }, update, { new: true })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> findOneAndUpdate() -> orderId: ${orderId} | update: ${JSON.stringify(update)}`);
+   });
 
-    return order;
+  if (!order) {
+   throw new CustomError(404, `No order found with orderId: ${orderId}`);
   }
 
-  public async updateStatus(
-    orderId: string,
-    status: 'pending' | 'paid' | 'finished' | 'failed' | 'processing' | 'fraud_attempt' | 'cancelled',
-    logContext: string
-  ): Promise<OrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> updateStatus()`;
+  return order;
+ }
 
-    const update: UpdateQuery<IOrder> = { status };
+ public async updateStatus(
+  orderId: string,
+  status: 'pending' | 'paid' | 'finished' | 'failed' | 'processing' | 'fraud_attempt' | 'cancelled',
+  logContext: string
+ ): Promise<OrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> updateStatus()`;
 
-    if (status === 'paid' || status === 'finished') {
-      update.paidAt = new Date();
-    } else if (status === 'failed' || status === 'cancelled') {
-      update.failedAt = new Date();
-    }
+  const update: UpdateQuery<IOrder> = { status };
 
-    return this.updateByOrderId(orderId, update, logContext);
+  if (status === 'paid' || status === 'finished') {
+   update.paidAt = new Date();
+  } else if (status === 'failed' || status === 'cancelled') {
+   update.failedAt = new Date();
   }
 
-  public async deleteMany(filter: FilterQuery<IOrder>, logContext: string): Promise<number> {
-    logContext = `${logContext} -> ${this.logContext} -> deleteMany()`;
+  return this.updateByOrderId(orderId, update, logContext);
+ }
 
-    const result = await Order.deleteMany(filter)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
-      });
+ public async deleteMany(filter: FilterQuery<IOrder>, logContext: string): Promise<number> {
+  logContext = `${logContext} -> ${this.logContext} -> deleteMany()`;
 
-    return result.deletedCount ?? 0;
+  const result = await Order.deleteMany(filter)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
+   });
+
+  return result.deletedCount ?? 0;
+ }
+
+ private static instance: OrderDataLayer;
+
+ public static getInstance(): OrderDataLayer {
+  if (!OrderDataLayer.instance) {
+   OrderDataLayer.instance = new OrderDataLayer();
   }
 
-  private static instance: OrderDataLayer;
-
-  public static getInstance(): OrderDataLayer {
-    if (!OrderDataLayer.instance) {
-      OrderDataLayer.instance = new OrderDataLayer();
-    }
-
-    return OrderDataLayer.instance;
-  }
+  return OrderDataLayer.instance;
+ }
 
 }

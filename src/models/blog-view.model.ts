@@ -3,27 +3,27 @@ import mongoose, { Schema } from 'mongoose';
 import Config from './../config';
 
 interface IBlogView {
-  slug: string;
-  views: number;
-  createdAt: Date;
-  updatedAt: Date;
+ slug: string;
+ views: number;
+ createdAt: Date;
+ updatedAt: Date;
 }
 
 const BlogViewSchema = new Schema<IBlogView>(
-  {
-    slug: {
-      type: String,
-      required: true,
-    },
-    views: {
-      type: Number,
-      default: 0,
-    },
+ {
+  slug: {
+   type: String,
+   required: true,
   },
-  {
-    timestamps: true,
-    collection: 'blog-views',
-  }
+  views: {
+   type: Number,
+   default: 0,
+  },
+ },
+ {
+  timestamps: true,
+  collection: 'blog-views',
+ }
 );
 
 BlogViewSchema.index({ slug: 1 }, { unique: true });

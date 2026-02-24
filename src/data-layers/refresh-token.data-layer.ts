@@ -6,51 +6,51 @@ import { RefreshToken, RefreshTokenDoc, IRefreshToken } from './../models/refres
 
 export default class RefreshTokenDataLayer {
 
-  private logContext = 'Refresh Token Data Layer';
+ private logContext = 'Refresh Token Data Layer';
 
-  public async create(data: Partial<IRefreshToken>, logContext: string): Promise<RefreshTokenDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> create()`;
+ public async create(data: Partial<IRefreshToken>, logContext: string): Promise<RefreshTokenDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> create()`;
 
-    const refreshToken = await RefreshToken.create(data)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> data: ${JSON.stringify(data)}`);
-      });
+  const refreshToken = await RefreshToken.create(data)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> data: ${JSON.stringify(data)}`);
+   });
 
-    return refreshToken;
+  return refreshToken;
+ }
+
+ public async getByUserId(userId: mongoose.Types.ObjectId, logContext: string): Promise<RefreshTokenDoc | null> {
+  logContext = `${logContext} -> ${this.logContext} -> getByUserId()`;
+
+  if (!mongoose.isValidObjectId(userId)) {
+   throw new CustomError(400, `Invalid ID`);
   }
 
-  public async getByUserId(userId: mongoose.Types.ObjectId, logContext: string): Promise<RefreshTokenDoc | null> {
-    logContext = `${logContext} -> ${this.logContext} -> getByUserId()`;
+  const refreshToken = await RefreshToken.findOne({ userId })
+   .catch(err => {
+    throw new CustomError(500, err.messagem, `${logContext} -> RefreshToken.findOne() -> userId: ${userId}`);
+   });
 
-    if (!mongoose.isValidObjectId(userId)) {
-      throw new CustomError(400, `Invalid ID`);
-    }
+  return refreshToken;
+ }
 
-    const refreshToken = await RefreshToken.findOne({ userId })
-      .catch(err => {
-        throw new CustomError(500, err.messagem, `${logContext} -> RefreshToken.findOne() -> userId: ${userId}`);
-      });
+ public async delete(refreshToken: RefreshTokenDoc, logContext: string): Promise<void> {
+  logContext = `${logContext} -> ${this.logContext} -> delete()`;
 
-    return refreshToken;
+  await refreshToken.deleteOne()
+    .catch(err => {
+      throw new CustomError(500, err.message, `${logContext} -> refreshToken: ${JSON.stringify(refreshToken)}`);
+    });
+ }
+
+ private static instance: RefreshTokenDataLayer;
+
+ public static getInstance(): RefreshTokenDataLayer {
+  if (!RefreshTokenDataLayer.instance) {
+    RefreshTokenDataLayer.instance = new RefreshTokenDataLayer();
   }
 
-  public async delete(refreshToken: RefreshTokenDoc, logContext: string): Promise<void> {
-    logContext = `${logContext} -> ${this.logContext} -> delete()`;
-
-    await refreshToken.deleteOne()
-        .catch(err => {
-            throw new CustomError(500, err.message, `${logContext} -> refreshToken: ${JSON.stringify(refreshToken)}`);
-        });
-  }
-
-  private static instance: RefreshTokenDataLayer;
-
-  public static getInstance(): RefreshTokenDataLayer {
-    if (!RefreshTokenDataLayer.instance) {
-        RefreshTokenDataLayer.instance = new RefreshTokenDataLayer();
-    }
-
-    return RefreshTokenDataLayer.instance;
-  }
+  return RefreshTokenDataLayer.instance;
+ }
 
 }

@@ -12,27 +12,27 @@ const AdminRouter = Router();
 
 // Configure multer with memory storage (files go to GridFS, not disk)
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max file size
-  },
-  fileFilter: (req, file, cb) => {
-    // Allow common document formats
-    const allowedMimes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'image/jpeg',
-      'image/png',
-      'image/jpg',
-    ];
+ storage: multer.memoryStorage(),
+ limits: {
+  fileSize: 10 * 1024 * 1024, // 10MB max file size
+ },
+ fileFilter: (req, file, cb) => {
+  // Allow common document formats
+  const allowedMimes = [
+   'application/pdf',
+   'application/msword',
+   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+   'image/jpeg',
+   'image/png',
+   'image/jpg',
+  ];
 
-    if (allowedMimes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only PDF, DOC, DOCX, and images are allowed.'));
-    }
+  if (allowedMimes.includes(file.mimetype)) {
+   cb(null, true);
+  } else {
+   cb(new Error('Invalid file type. Only PDF, DOC, DOCX, and images are allowed.'));
   }
+ }
 });
 
 // All admin routes require authentication and admin role

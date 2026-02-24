@@ -6,107 +6,107 @@ import { Document, DocumentDoc, IDocument } from './../models/document.model';
 
 export default class DocumentDataLayer {
 
-  private logContext = 'Document Data Layer';
+ private logContext = 'Document Data Layer';
 
-  public async create(data: Partial<IDocument>, logContext: string): Promise<DocumentDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> create()`;
+ public async create(data: Partial<IDocument>, logContext: string): Promise<DocumentDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> create()`;
 
-    const document = await Document.create(data)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> data: ${JSON.stringify(data)}`);
-      });
+  const document = await Document.create(data)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> data: ${JSON.stringify(data)}`);
+   });
 
-    return document;
+  return document;
+ }
+
+ public async get(filter: FilterQuery<IDocument>, logContext: string): Promise<DocumentDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> get()`;
+
+  const document = await Document.findOne(filter)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
+   });
+
+  if (!document) {
+   throw new CustomError(404, `No document found`);
   }
 
-  public async get(filter: FilterQuery<IDocument>, logContext: string): Promise<DocumentDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> get()`;
+  return document;
+ }
 
-    const document = await Document.findOne(filter)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
-      });
+ public async getById(id: string | mongoose.Types.ObjectId, logContext: string): Promise<DocumentDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> getById()`;
 
-    if (!document) {
-      throw new CustomError(404, `No document found`);
-    }
-
-    return document;
+  if (!mongoose.isValidObjectId(id)) {
+   throw new CustomError(400, `Invalid ID`);
   }
 
-  public async getById(id: string | mongoose.Types.ObjectId, logContext: string): Promise<DocumentDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> getById()`;
+  const document = await Document.findById(id)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> id: ${id.toString()}`);
+   });
 
-    if (!mongoose.isValidObjectId(id)) {
-      throw new CustomError(400, `Invalid ID`);
-    }
-
-    const document = await Document.findById(id)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> id: ${id.toString()}`);
-      });
-
-    if (!document) {
-      throw new CustomError(404, `No document found`);
-    }
-
-    return document;
+  if (!document) {
+   throw new CustomError(404, `No document found`);
   }
 
-  public async getAll(filter: FilterQuery<IDocument>, logContext: string): Promise<DocumentDoc[]> {
-    logContext = `${logContext} -> ${this.logContext} -> getAll()`;
+  return document;
+ }
 
-    const documents = await Document.find(filter)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
-      });
+ public async getAll(filter: FilterQuery<IDocument>, logContext: string): Promise<DocumentDoc[]> {
+  logContext = `${logContext} -> ${this.logContext} -> getAll()`;
 
-    return documents;
+  const documents = await Document.find(filter)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
+   });
+
+  return documents;
+ }
+
+ public async update(id: string | mongoose.Types.ObjectId, update: UpdateQuery<IDocument>, logContext: string): Promise<DocumentDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> update()`;
+
+  if (!mongoose.isValidObjectId(id)) {
+   throw new CustomError(400, `Invalid ID`);
   }
 
-  public async update(id: string | mongoose.Types.ObjectId, update: UpdateQuery<IDocument>, logContext: string): Promise<DocumentDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> update()`;
+  const document = await Document.findByIdAndUpdate(id, update, { new: true })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> findByIdAndUpdate() -> id: ${id.toString()} | update: ${JSON.stringify(update)}`);
+   });
 
-    if (!mongoose.isValidObjectId(id)) {
-      throw new CustomError(400, `Invalid ID`);
-    }
-
-    const document = await Document.findByIdAndUpdate(id, update, { new: true })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> findByIdAndUpdate() -> id: ${id.toString()} | update: ${JSON.stringify(update)}`);
-      });
-
-    if (!document) {
-      throw new CustomError(404, `No document found`);
-    }
-
-    return document;
+  if (!document) {
+   throw new CustomError(404, `No document found`);
   }
 
-  public async updateByFilter(filter: FilterQuery<IDocument>, update: UpdateQuery<IDocument>, logContext: string): Promise<DocumentDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> updateByFilter()`;
+  return document;
+ }
 
-    const document = await Document.findOneAndUpdate(filter, update, { new: true })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> findOneAndUpdate() -> filter: ${JSON.stringify(filter)} | update: ${JSON.stringify(update)}`);
-      });
+ public async updateByFilter(filter: FilterQuery<IDocument>, update: UpdateQuery<IDocument>, logContext: string): Promise<DocumentDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> updateByFilter()`;
 
-    if (!document) {
-      throw new CustomError(404, `No document found`);
-    }
+  const document = await Document.findOneAndUpdate(filter, update, { new: true })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> findOneAndUpdate() -> filter: ${JSON.stringify(filter)} | update: ${JSON.stringify(update)}`);
+   });
 
-    return document;
+  if (!document) {
+   throw new CustomError(404, `No document found`);
   }
 
-  private static instance: DocumentDataLayer;
+  return document;
+ }
 
-  public static getInstance(): DocumentDataLayer {
-    if (!DocumentDataLayer.instance) {
-      DocumentDataLayer.instance = new DocumentDataLayer();
-    }
+ private static instance: DocumentDataLayer;
 
-    return DocumentDataLayer.instance;
+ public static getInstance(): DocumentDataLayer {
+  if (!DocumentDataLayer.instance) {
+   DocumentDataLayer.instance = new DocumentDataLayer();
   }
+
+  return DocumentDataLayer.instance;
+ }
 
 }
 

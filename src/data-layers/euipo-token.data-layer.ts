@@ -4,42 +4,42 @@ import { EuipoToken, EUIPO_TOKEN_DOC_ID, IEuipoToken } from './../models/euipo-t
 
 export default class EuipoTokenDataLayer {
 
-  private logContext = 'EUIPO Token Data Layer';
+ private logContext = 'EUIPO Token Data Layer';
 
-  public async get(logContext: string): Promise<IEuipoToken | null> {
-    logContext = `${logContext} -> ${this.logContext} -> get()`;
-    try {
-      return await EuipoToken.findById(EUIPO_TOKEN_DOC_ID).lean();
-    } catch (err: any) {
-      logger.error(err.message, logContext);
-      return null;
-    }
+ public async get(logContext: string): Promise<IEuipoToken | null> {
+  logContext = `${logContext} -> ${this.logContext} -> get()`;
+  return EuipoToken.findById(EUIPO_TOKEN_DOC_ID)
+   .lean()
+   .catch((err: any) => {
+    logger.error(err.message, logContext);
+    return null;
+   });
+ }
+
+ public async upsert(
+  accessToken: string,
+  refreshToken: string | null,
+  expiresAt: Date,
+  logContext: string,
+ ): Promise<void> {
+  logContext = `${logContext} -> ${this.logContext} -> upsert()`;
+  return EuipoToken.findByIdAndUpdate(
+   EUIPO_TOKEN_DOC_ID,
+   { accessToken, refreshToken, expiresAt },
+   { upsert: true, new: true },
+  )
+   .then(() => {})
+   .catch((err: any) => {
+    logger.error(err.message, logContext);
+   });
+ }
+
+ private static instance: EuipoTokenDataLayer;
+
+ public static getInstance(): EuipoTokenDataLayer {
+  if (!EuipoTokenDataLayer.instance) {
+   EuipoTokenDataLayer.instance = new EuipoTokenDataLayer();
   }
-
-  public async upsert(
-    accessToken: string,
-    refreshToken: string | null,
-    expiresAt: Date,
-    logContext: string,
-  ): Promise<void> {
-    logContext = `${logContext} -> ${this.logContext} -> upsert()`;
-    try {
-      await EuipoToken.findByIdAndUpdate(
-        EUIPO_TOKEN_DOC_ID,
-        { accessToken, refreshToken, expiresAt },
-        { upsert: true, new: true },
-      );
-    } catch (err: any) {
-      logger.error(err.message, logContext);
-    }
-  }
-
-  private static instance: EuipoTokenDataLayer;
-
-  public static getInstance(): EuipoTokenDataLayer {
-    if (!EuipoTokenDataLayer.instance) {
-      EuipoTokenDataLayer.instance = new EuipoTokenDataLayer();
-    }
-    return EuipoTokenDataLayer.instance;
-  }
+  return EuipoTokenDataLayer.instance;
+ }
 }

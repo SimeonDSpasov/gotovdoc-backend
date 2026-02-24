@@ -5,13 +5,13 @@ import ConnectionManager from './connection-manager';
 import { registerOrderCleanupCron } from './cronjobs/order-cleanup.cron';
 
 (async () => {
-  try {
-    new LoggerSetup();
+ try {
+  new LoggerSetup();
 
-    await ConnectionManager.getInstance().initConnections();
+  await ConnectionManager.getInstance().initConnections();
 
-    registerOrderCleanupCron();
-  } catch (err: any) {
-    logger.error(err, 'Worker Init Error');
-  }
+  registerOrderCleanupCron();
+ } catch (err: any) {
+  logger.error(err, 'Worker Init Error');
+ }
 })();

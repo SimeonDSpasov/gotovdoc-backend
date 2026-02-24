@@ -20,42 +20,29 @@ const TrademarkRouter = Router();
 // Configure multer for temp storage (logo/image uploads)
 const uploadDir = path.join(__dirname, '../../uploads/temp');
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+ fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  },
+ destination: (req, file, cb) => {
+  cb(null, uploadDir);
+ },
+ filename: (req, file, cb) => {
+  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+  cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+ },
 });
 
 const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+ storage,
+ limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
 // Create trademark order (guest + auth)
 TrademarkRouter.post(
-  '/create-order',
-  useCatch(authMiddleware.attachUserIfPresent),
-  upload.fields([
-    { name: 'markFile', maxCount: 1 },
-    { name: 'collectiveFile', maxCount: 1 },
-    { name: 'certifiedFile', maxCount: 1 },
-    { name: 'poaFiles', maxCount: 10 },
-    { name: 'conventionCertificateFiles', maxCount: 10 },
-    { name: 'exhibitionDocumentFiles', maxCount: 10 },
-    { name: 'additionalFiles', maxCount: 5 },
-  ]),
-  useCatch(trademarkController.createOrder)
-);
-
-// Draft management (authenticated)
-const multerFields = [
+ '/create-order',
+ useCatch(authMiddleware.attachUserIfPresent),
+ upload.fields([
   { name: 'markFile', maxCount: 1 },
   { name: 'collectiveFile', maxCount: 1 },
   { name: 'certifiedFile', maxCount: 1 },
@@ -63,72 +50,85 @@ const multerFields = [
   { name: 'conventionCertificateFiles', maxCount: 10 },
   { name: 'exhibitionDocumentFiles', maxCount: 10 },
   { name: 'additionalFiles', maxCount: 5 },
+ ]),
+ useCatch(trademarkController.createOrder)
+);
+
+// Draft management (authenticated)
+const multerFields = [
+ { name: 'markFile', maxCount: 1 },
+ { name: 'collectiveFile', maxCount: 1 },
+ { name: 'certifiedFile', maxCount: 1 },
+ { name: 'poaFiles', maxCount: 10 },
+ { name: 'conventionCertificateFiles', maxCount: 10 },
+ { name: 'exhibitionDocumentFiles', maxCount: 10 },
+ { name: 'additionalFiles', maxCount: 5 },
 ];
 
 TrademarkRouter.post(
-  '/save-draft',
-  useCatch(authMiddleware.attachUserIfPresent),
-  upload.fields(multerFields),
-  useCatch(trademarkController.saveDraft)
+ '/save-draft',
+ useCatch(authMiddleware.attachUserIfPresent),
+ upload.fields(multerFields),
+ useCatch(trademarkController.saveDraft)
 );
 
 TrademarkRouter.get(
-  '/drafts',
-  useCatch(authMiddleware.isAuthenticated),
-  useCatch(trademarkController.getUserDrafts)
+ '/drafts',
+ useCatch(authMiddleware.isAuthenticated),
+ useCatch(trademarkController.getUserDrafts)
 );
 
 TrademarkRouter.post(
-  '/drafts/claim',
-  useCatch(authMiddleware.isAuthenticated),
-  useCatch(trademarkController.claimDraft)
+ '/drafts/claim',
+ useCatch(authMiddleware.isAuthenticated),
+ useCatch(trademarkController.claimDraft)
 );
 
 TrademarkRouter.get(
-  '/drafts/:orderId',
-  useCatch(authMiddleware.isAuthenticated),
-  useCatch(trademarkController.getDraft)
+ '/drafts/:orderId',
+ useCatch(authMiddleware.isAuthenticated),
+ useCatch(trademarkController.getDraft)
 );
 
 TrademarkRouter.put(
-  '/drafts/:orderId',
-  useCatch(authMiddleware.isAuthenticated),
-  upload.fields(multerFields),
-  useCatch(trademarkController.updateDraft)
+ '/drafts/:orderId',
+ useCatch(authMiddleware.isAuthenticated),
+ upload.fields(multerFields),
+ useCatch(trademarkController.updateDraft)
 );
 
 TrademarkRouter.delete(
-  '/drafts/:orderId',
-  useCatch(authMiddleware.isAuthenticated),
-  useCatch(trademarkController.deleteDraft)
+ '/drafts/:orderId',
+ useCatch(authMiddleware.isAuthenticated),
+ useCatch(trademarkController.deleteDraft)
 );
 
 // Get user's trademark orders (authenticated)
 TrademarkRouter.get(
-  '/orders',
-  useCatch(authMiddleware.isAuthenticated),
-  useCatch(trademarkController.getUserOrders)
+ '/orders',
+ useCatch(authMiddleware.isAuthenticated),
+ useCatch(trademarkController.getUserOrders)
 );
 
 // Get specific trademark order (authenticated)
 TrademarkRouter.get(
-  '/orders/:orderId',
-  useCatch(authMiddleware.isAuthenticated),
-  useCatch(trademarkController.getOrder)
+ '/orders/:orderId',
+ useCatch(authMiddleware.isAuthenticated),
+ useCatch(trademarkController.getOrder)
 );
 
 // Revert pending order back to draft (guest + auth)
 TrademarkRouter.put(
-  '/orders/:orderId/revert-to-draft',
-  useCatch(authMiddleware.attachUserIfPresent),
-  useCatch(trademarkController.revertToDraft)
+ '/orders/:orderId/revert-to-draft',
+ useCatch(authMiddleware.attachUserIfPresent),
+ useCatch(trademarkController.revertToDraft)
 );
 
 // Download power of attorney (guest with email or auth)
 TrademarkRouter.get(
-  '/power-of-attorney/:orderId',
-  useCatch(authMiddleware.attachUserIfPresent),
-  useCatch(trademarkController.downloadPowerOfAttorney)
+ '/power-of-attorney/:orderId',
+ useCatch(authMiddleware.attachUserIfPresent),
+ useCatch(trademarkController.downloadPowerOfAttorney)
 );
 
 // EUIPO Goods & Services endpoints (public, no auth — served from DB)

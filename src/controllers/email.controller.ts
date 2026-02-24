@@ -7,38 +7,38 @@ import { EmailType, EmailUtil } from './../utils/email.util';
 import Config from './../config';
 
 export default class EmailController {
-  
-  private logContext = 'Email Controller';
-  
-  private config = Config.getInstance();
+ 
+ private logContext = 'Email Controller';
+ 
+ private config = Config.getInstance();
 
-  private emailUtil = EmailUtil.getInstance();
+ private emailUtil = EmailUtil.getInstance();
 
-  public contactUs: RequestHandler = async (req, res) => {
-    const { firstName, lastName, email, phoneNumber, message } = req.body
+ public contactUs: RequestHandler = async (req, res) => {
+  const { firstName, lastName, email, phoneNumber, message } = req.body
 
-    if (!firstName || !lastName || !email || !phoneNumber || !message) {
-      throw new CustomError(400, 'Missing fields: name | email | phoneNumber | message');
-    }
-
-    const logContext = `${this.logContext} -> contactUs()`;
-
-    const emailData = {
-      toEmail: this.config.infoAccountEmail,
-      subject: 'Contact Us Request',
-      template: 'contact-us',
-      payload: {
-        name: `${firstName} ${lastName}`,
-        email: email,
-        phoneNumber: phoneNumber,
-        message: message,
-      },
-    };
-
-    this.emailUtil.sendEmail(emailData, EmailType.Info, logContext)
-      .catch((err: any) => logger.error(`Failed to send contact us email: ${err.message}`, logContext));
-
-    res.status(200).json();
+  if (!firstName || !lastName || !email || !phoneNumber || !message) {
+   throw new CustomError(400, 'Missing fields: name | email | phoneNumber | message');
   }
+
+  const logContext = `${this.logContext} -> contactUs()`;
+
+  const emailData = {
+   toEmail: this.config.infoAccountEmail,
+   subject: 'Contact Us Request',
+   template: 'contact-us',
+   payload: {
+    name: `${firstName} ${lastName}`,
+    email: email,
+    phoneNumber: phoneNumber,
+    message: message,
+   },
+  };
+
+  this.emailUtil.sendEmail(emailData, EmailType.Info, logContext)
+   .catch((err: any) => logger.error(`Failed to send contact us email: ${err.message}`, logContext));
+
+  res.status(200).json();
+ }
 
 }

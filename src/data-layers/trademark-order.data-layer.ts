@@ -6,167 +6,167 @@ import { TrademarkOrder, TrademarkOrderDoc, ITrademarkOrder } from './../models/
 
 export default class TrademarkOrderDataLayer {
 
-  private logContext = 'Trademark Order Data Layer';
+ private logContext = 'Trademark Order Data Layer';
 
-  public async create(data: Partial<ITrademarkOrder>, logContext: string): Promise<TrademarkOrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> create()`;
+ public async create(data: Partial<ITrademarkOrder>, logContext: string): Promise<TrademarkOrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> create()`;
 
-    const order = await TrademarkOrder.create(data)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> data: ${JSON.stringify(data)}`);
-      });
+  const order = await TrademarkOrder.create(data)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> data: ${JSON.stringify(data)}`);
+   });
 
-    return order;
+  return order;
+ }
+
+ public async get(filter: FilterQuery<ITrademarkOrder>, logContext: string): Promise<TrademarkOrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> get()`;
+
+  const order = await TrademarkOrder.findOne(filter)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
+   });
+
+  if (!order) {
+   throw new CustomError(404, 'No trademark order found');
   }
 
-  public async get(filter: FilterQuery<ITrademarkOrder>, logContext: string): Promise<TrademarkOrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> get()`;
+  return order;
+ }
 
-    const order = await TrademarkOrder.findOne(filter)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
-      });
+ public async getById(id: string | mongoose.Types.ObjectId, logContext: string): Promise<TrademarkOrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> getById()`;
 
-    if (!order) {
-      throw new CustomError(404, 'No trademark order found');
-    }
-
-    return order;
+  if (!mongoose.isValidObjectId(id)) {
+   throw new CustomError(400, 'Invalid ID');
   }
 
-  public async getById(id: string | mongoose.Types.ObjectId, logContext: string): Promise<TrademarkOrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> getById()`;
+  const order = await TrademarkOrder.findById(id)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> id: ${id.toString()}`);
+   });
 
-    if (!mongoose.isValidObjectId(id)) {
-      throw new CustomError(400, 'Invalid ID');
-    }
-
-    const order = await TrademarkOrder.findById(id)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> id: ${id.toString()}`);
-      });
-
-    if (!order) {
-      throw new CustomError(404, 'No trademark order found');
-    }
-
-    return order;
+  if (!order) {
+   throw new CustomError(404, 'No trademark order found');
   }
 
-  public async getByOrderId(orderId: string, logContext: string): Promise<TrademarkOrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> getByOrderId()`;
+  return order;
+ }
 
-    const order = await TrademarkOrder.findOne({ orderId })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> orderId: ${orderId}`);
-      });
+ public async getByOrderId(orderId: string, logContext: string): Promise<TrademarkOrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> getByOrderId()`;
 
-    if (!order) {
-      throw new CustomError(404, `No trademark order found with orderId: ${orderId}`);
-    }
+  const order = await TrademarkOrder.findOne({ orderId })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> orderId: ${orderId}`);
+   });
 
-    return order;
+  if (!order) {
+   throw new CustomError(404, `No trademark order found with orderId: ${orderId}`);
   }
 
-  public async getAll(filter: FilterQuery<ITrademarkOrder>, logContext: string): Promise<TrademarkOrderDoc[]> {
-    logContext = `${logContext} -> ${this.logContext} -> getAll()`;
+  return order;
+ }
 
-    const orders = await TrademarkOrder.find(filter)
-      .sort({ createdAt: -1 })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
-      });
+ public async getAll(filter: FilterQuery<ITrademarkOrder>, logContext: string): Promise<TrademarkOrderDoc[]> {
+  logContext = `${logContext} -> ${this.logContext} -> getAll()`;
 
-    return orders;
+  const orders = await TrademarkOrder.find(filter)
+   .sort({ createdAt: -1 })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
+   });
+
+  return orders;
+ }
+
+ public async getUserOrders(userId: string | mongoose.Types.ObjectId, logContext: string): Promise<TrademarkOrderDoc[]> {
+  logContext = `${logContext} -> ${this.logContext} -> getUserOrders()`;
+
+  if (!mongoose.isValidObjectId(userId)) {
+   throw new CustomError(400, 'Invalid user ID');
   }
 
-  public async getUserOrders(userId: string | mongoose.Types.ObjectId, logContext: string): Promise<TrademarkOrderDoc[]> {
-    logContext = `${logContext} -> ${this.logContext} -> getUserOrders()`;
+  const orders = await TrademarkOrder.find({ userId })
+   .sort({ createdAt: -1 })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> userId: ${userId.toString()}`);
+   });
 
-    if (!mongoose.isValidObjectId(userId)) {
-      throw new CustomError(400, 'Invalid user ID');
-    }
+  return orders;
+ }
 
-    const orders = await TrademarkOrder.find({ userId })
-      .sort({ createdAt: -1 })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> userId: ${userId.toString()}`);
-      });
+ public async update(id: string | mongoose.Types.ObjectId, update: UpdateQuery<ITrademarkOrder>, logContext: string): Promise<TrademarkOrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> update()`;
 
-    return orders;
+  if (!mongoose.isValidObjectId(id)) {
+   throw new CustomError(400, 'Invalid ID');
   }
 
-  public async update(id: string | mongoose.Types.ObjectId, update: UpdateQuery<ITrademarkOrder>, logContext: string): Promise<TrademarkOrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> update()`;
+  const order = await TrademarkOrder.findByIdAndUpdate(id, update, { new: true })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> findByIdAndUpdate() -> id: ${id.toString()} | update: ${JSON.stringify(update)}`);
+   });
 
-    if (!mongoose.isValidObjectId(id)) {
-      throw new CustomError(400, 'Invalid ID');
-    }
-
-    const order = await TrademarkOrder.findByIdAndUpdate(id, update, { new: true })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> findByIdAndUpdate() -> id: ${id.toString()} | update: ${JSON.stringify(update)}`);
-      });
-
-    if (!order) {
-      throw new CustomError(404, 'No trademark order found');
-    }
-
-    return order;
+  if (!order) {
+   throw new CustomError(404, 'No trademark order found');
   }
 
-  public async updateByOrderId(orderId: string, update: UpdateQuery<ITrademarkOrder>, logContext: string): Promise<TrademarkOrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> updateByOrderId()`;
+  return order;
+ }
 
-    const order = await TrademarkOrder.findOneAndUpdate({ orderId }, update, { new: true })
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> findOneAndUpdate() -> orderId: ${orderId} | update: ${JSON.stringify(update)}`);
-      });
+ public async updateByOrderId(orderId: string, update: UpdateQuery<ITrademarkOrder>, logContext: string): Promise<TrademarkOrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> updateByOrderId()`;
 
-    if (!order) {
-      throw new CustomError(404, `No trademark order found with orderId: ${orderId}`);
-    }
+  const order = await TrademarkOrder.findOneAndUpdate({ orderId }, update, { new: true })
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> findOneAndUpdate() -> orderId: ${orderId} | update: ${JSON.stringify(update)}`);
+   });
 
-    return order;
+  if (!order) {
+   throw new CustomError(404, `No trademark order found with orderId: ${orderId}`);
   }
 
-  public async updateStatus(
-    orderId: string,
-    status: ITrademarkOrder['status'],
-    logContext: string
-  ): Promise<TrademarkOrderDoc> {
-    logContext = `${logContext} -> ${this.logContext} -> updateStatus()`;
+  return order;
+ }
 
-    const update: UpdateQuery<ITrademarkOrder> = { status };
+ public async updateStatus(
+  orderId: string,
+  status: ITrademarkOrder['status'],
+  logContext: string
+ ): Promise<TrademarkOrderDoc> {
+  logContext = `${logContext} -> ${this.logContext} -> updateStatus()`;
 
-    if (status === 'paid') {
-      update.paidAt = new Date();
-    } else if (status === 'cancelled' || status === 'rejected') {
-      update.failedAt = new Date();
-    }
+  const update: UpdateQuery<ITrademarkOrder> = { status };
 
-    return this.updateByOrderId(orderId, update, logContext);
+  if (status === 'paid') {
+   update.paidAt = new Date();
+  } else if (status === 'cancelled' || status === 'rejected') {
+   update.failedAt = new Date();
   }
 
-  public async deleteMany(filter: FilterQuery<ITrademarkOrder>, logContext: string): Promise<number> {
-    logContext = `${logContext} -> ${this.logContext} -> deleteMany()`;
+  return this.updateByOrderId(orderId, update, logContext);
+ }
 
-    const result = await TrademarkOrder.deleteMany(filter)
-      .catch(err => {
-        throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
-      });
+ public async deleteMany(filter: FilterQuery<ITrademarkOrder>, logContext: string): Promise<number> {
+  logContext = `${logContext} -> ${this.logContext} -> deleteMany()`;
 
-    return result.deletedCount ?? 0;
+  const result = await TrademarkOrder.deleteMany(filter)
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> filter: ${JSON.stringify(filter)}`);
+   });
+
+  return result.deletedCount ?? 0;
+ }
+
+ private static instance: TrademarkOrderDataLayer;
+
+ public static getInstance(): TrademarkOrderDataLayer {
+  if (!TrademarkOrderDataLayer.instance) {
+   TrademarkOrderDataLayer.instance = new TrademarkOrderDataLayer();
   }
 
-  private static instance: TrademarkOrderDataLayer;
-
-  public static getInstance(): TrademarkOrderDataLayer {
-    if (!TrademarkOrderDataLayer.instance) {
-      TrademarkOrderDataLayer.instance = new TrademarkOrderDataLayer();
-    }
-
-    return TrademarkOrderDataLayer.instance;
-  }
+  return TrademarkOrderDataLayer.instance;
+ }
 
 }
