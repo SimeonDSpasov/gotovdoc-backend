@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-
 import multer from 'multer';
 import { Router } from 'express';
 
@@ -13,24 +10,9 @@ const trademarkAdminController = TrademarkAdminController.getInstance();
 
 const TrademarkAdminRouter = Router();
 
-// Configure multer for file uploads
-const uploadDir = path.join(__dirname, '../../../uploads/trademark-orders');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  },
-});
-
+// Configure multer with memory storage (files go to GridFS, not disk)
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB
   },
@@ -64,6 +46,18 @@ TrademarkAdminRouter.get(
 TrademarkAdminRouter.get(
   '/orders/:id',
   useCatch(trademarkAdminController.getOrderById)
+);
+
+// Download admin-uploaded finished file (from GridFS)
+TrademarkAdminRouter.get(
+  '/orders/:id/finished-files/:fileId',
+  useCatch(trademarkAdminController.downloadFinishedFile)
+);
+
+// Delete admin-uploaded finished file
+TrademarkAdminRouter.delete(
+  '/orders/:id/finished-files/:fileId',
+  useCatch(trademarkAdminController.deleteFinishedFile)
 );
 
 // Update trademark order status

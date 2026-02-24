@@ -1,0 +1,50 @@
+<div style="text-align: center; margin-bottom: 40px;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto 20px auto;">
+    <tr>
+      <td style="width: 80px; height: 80px; background: linear-gradient(135deg, #1db4a1 0%, #16a085 100%); border-radius: 50%; text-align: center; vertical-align: middle;">
+        <span style="font-size: 40px; line-height: 1; display: inline-block; margin-top: -4px;">✅</span>
+      </td>
+    </tr>
+  </table>
+  <h2 style="color: #ffffff; margin: 0 0 10px 0; font-size: 28px; font-weight: 600;">Поръчката е завършена</h2>
+  <p style="color: #8b9db5; font-size: 16px; margin: 0;">Вашите документи са готови</p>
+</div>
+
+<div style="margin: 30px 0;">
+  <p style="color: #e8edf3; font-size: 16px; line-height: 1.8; margin-bottom: 20px;">
+    Здравейте <strong style="color: #1db4a1;">{{customerName}}</strong>,
+  </p>
+  <p style="color: #c5d1e0; font-size: 16px; line-height: 1.8; margin-bottom: 20px;">
+    Вашата поръчка <strong style="color: #ffffff;">{{orderId}}</strong> е успешно обработена и документите са готови.
+  </p>
+</div>
+
+{{#if hasAttachments}}
+<div style="margin: 40px 0; padding: 25px; background-color: rgba(29, 180, 161, 0.1); border-left: 4px solid #1db4a1; border-radius: 6px;">
+  <p style="color: #c5d1e0; font-size: 15px; margin: 0; line-height: 1.6;">
+    <strong style="color: #1db4a1;">📎 Прикачени файлове</strong><br>
+    Готовите документи са прикачени към този имейл. Моля, проверете прикачените файлове.
+  </p>
+</div>
+{{/if}}
+
+<div style="margin: 30px 0;">
+  <h3 style="color: #ffffff; font-size: 16px; font-weight: 600; margin: 0 0 15px 0; padding-bottom: 10px; border-bottom: 2px solid rgba(29, 180, 161, 0.3);">📦 Детайли за поръчката</h3>
+  <div style="margin-bottom: 12px; padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">НОМЕР НА ПОРЪЧКА</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0; font-family: 'Courier New', monospace;">{{orderId}}</p>
+  </div>
+  {{#if itemNames}}
+  <div style="padding: 15px 20px; background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+    <p style="color: #8b9db5; font-size: 12px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 0.5px;">АРТИКУЛИ</p>
+    <p style="color: #ffffff; font-size: 14px; margin: 0;">{{itemNames}}</p>
+  </div>
+  {{/if}}
+</div>
+
+<div style="margin: 40px 0; padding: 25px; background-color: rgba(255, 255, 255, 0.03); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">
+  <p style="color: #c5d1e0; font-size: 15px; margin: 0; line-height: 1.6;">
+    Ако имате въпроси или се нуждаете от съдействие, не се колебайте да се свържете с нас на
+    <a href="mailto:info@gotovdoc.bg" style="color: #1db4a1; text-decoration: none;">info@gotovdoc.bg</a>.
+  </p>
+</div>

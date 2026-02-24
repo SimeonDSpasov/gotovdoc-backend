@@ -1,9 +1,8 @@
 import { RequestHandler } from 'express';
 import mongoose from 'mongoose';
-import fs from 'fs';
-import path from 'path';
 
 import CustomError from './../utils/custom-error.utils';
+import FileStorageUtil from './../utils/file-storage.util';
 
 import OrderDataLayer from './../data-layers/order.data-layer';
 import UserDataLayer from './../data-layers/user.data-layer';
@@ -13,6 +12,7 @@ export default class UserController {
   private logContext = 'User Controller';
   private orderDataLayer = OrderDataLayer.getInstance();
   private userDataLayer = UserDataLayer.getInstance();
+  private fileStorageUtil = FileStorageUtil.getInstance();
 
   public getUser: RequestHandler = async (req, res) => {
     const user = req.user;
@@ -87,15 +87,12 @@ export default class UserController {
     }
 
     const file = files[idx];
-    const filePath = path.resolve(file.path);
 
-    if (!fs.existsSync(filePath)) {
-      throw new CustomError(404, 'File not found on disk');
-    }
+    const fileStream = await this.fileStorageUtil.downloadFile(file.fileId.toString());
 
     res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${file.originalName || file.filename}"`);
-    fs.createReadStream(filePath).pipe(res);
+    res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+    fileStream.pipe(res);
   }
 
   public getActivity: RequestHandler = async (req, res) => {

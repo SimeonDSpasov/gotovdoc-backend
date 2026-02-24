@@ -8,6 +8,7 @@ import EmailRouter from './email.router';
 import StripeRouter from './stripe.router';
 import PropertySearchRouter from './property-search.router';
 import TrademarkRouter from './trademark.router';
+import BlogRouter from './blog.router';
 import UserRouter from './user.router';
 
 
@@ -30,5 +31,7 @@ MainRouter.use('/api/trademark', TrademarkRouter);
 MainRouter.use('/api/property-search', PropertySearchRouter);
 
 MainRouter.use('/api/admin', AdminRouter);
+
+MainRouter.use('/api/blog', BlogRouter);
 
 export default MainRouter;

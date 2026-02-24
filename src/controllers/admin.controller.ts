@@ -1,8 +1,10 @@
 import { ObjectId } from 'mongodb';
 import { Request, RequestHandler } from 'express';
+import { Readable } from 'stream';
 
 import CustomError from './../utils/custom-error.utils';
 import FileStorageUtil from './../utils/file-storage.util';
+import { EmailUtil, EmailType } from './../utils/email.util';
 
 import DocumentDataLayer from './../data-layers/document.data-layer';
 import OrderDataLayer from './../data-layers/order.data-layer';
@@ -15,6 +17,7 @@ export default class AdminController {
     private orderDataLayer = OrderDataLayer.getInstance();
     private documentDataLayer = DocumentDataLayer.getInstance();
     private fileStorageUtil = FileStorageUtil.getInstance();
+    private emailUtil = EmailUtil.getInstance();
 
     /**
      * GET /api/admin/orders
@@ -130,7 +133,51 @@ export default class AdminController {
                 update.documentsGenerated = true;
             }
 
+            const order = await this.orderDataLayer.getById(id, logContext);
             const updatedOrder = await this.orderDataLayer.update(id, update, logContext);
+
+            // Send email when order is marked as finished, attaching all finishedFiles from GridFS
+            if (update.status === 'finished' && Array.isArray(order.finishedFiles) && order.finishedFiles.length > 0) {
+                const customerEmail = order.customerData?.email;
+                if (customerEmail) {
+                    const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+
+                    for (const file of order.finishedFiles) {
+                        try {
+                            const stream = await this.fileStorageUtil.downloadFile(file.fileId.toString());
+                            const buffer = await this.streamToBuffer(stream);
+                            attachments.push({
+                                filename: file.filename,
+                                content: buffer,
+                                contentType: file.mimetype || 'application/octet-stream',
+                            });
+                        } catch (err) {
+                            console.error(`Failed to read finished file ${file.fileId} from GridFS: ${(err as Error).message}`);
+                        }
+                    }
+
+                    const customerName = [order.customerData?.firstName, order.customerData?.lastName]
+                        .filter(Boolean).join(' ') || 'клиент';
+
+                    const itemNames = Array.isArray(order.items)
+                        ? order.items.map((item: any) => item.name).join(', ')
+                        : '';
+
+                    this.emailUtil.sendEmail({
+                        toEmail: customerEmail,
+                        subject: `Поръчка ${order.orderId} — Вашите документи са готови`,
+                        template: 'order-finished',
+                        payload: {
+                            customerName,
+                            orderId: order.orderId,
+                            itemNames,
+                            hasAttachments: attachments.length > 0,
+                        },
+                        attachments,
+                    }, EmailType.Info, logContext)
+                        .catch((err: any) => console.error(`Failed to send order finished email: ${err.message}`));
+                }
+            }
 
             res.status(200).json({
                 success: true,
@@ -143,7 +190,7 @@ export default class AdminController {
 
     /**
      * POST /api/admin/orders/:id/upload
-     * Upload files/documents for an order
+     * Upload files/documents for an order (stored in GridFS)
      */
     public uploadOrderFiles: RequestHandler = async (req, res, next) => {
         const logContext = `${this.logContext} -> uploadOrderFiles()`;
@@ -152,23 +199,26 @@ export default class AdminController {
             const { id } = req.params;
 
             // Verify order exists
-            const order = await this.orderDataLayer.getById(id, logContext);
+            await this.orderDataLayer.getById(id, logContext);
 
-            // Files are available in req.files (handled by multer middleware)
             const files = req.files as Express.Multer.File[];
 
             if (!files || files.length === 0) {
                 throw new CustomError(400, 'No files uploaded');
             }
 
-            // Store file information
-            const uploadedFiles = files.map(file => ({
-                filename: file.filename,
-                originalName: file.originalname,
-                path: file.path,
-                size: file.size,
-                mimetype: file.mimetype,
-            }));
+            // Upload each file to GridFS
+            const uploadedFiles = [];
+            for (const file of files) {
+                const stream = Readable.from(file.buffer);
+                const fileId = await this.fileStorageUtil.uploadFile(stream, file.originalname, file.mimetype);
+                uploadedFiles.push({
+                    fileId,
+                    filename: file.originalname,
+                    mimetype: file.mimetype,
+                    size: file.size,
+                });
+            }
 
             // Update order to mark documents as generated
             await this.orderDataLayer.update(id, {
@@ -228,6 +278,82 @@ export default class AdminController {
             res.setHeader('Content-Disposition', `attachment; filename="${target.filename || 'download'}"`);
 
             fileStream.pipe(res);
+        } catch (err) {
+            next(err);
+        }
+    };
+
+    /**
+     * GET /api/admin/orders/:id/finished-files/:fileId
+     * Download an admin-uploaded finished file (stored in GridFS)
+     */
+    public downloadFinishedFile: RequestHandler = async (req, res, next) => {
+        const logContext = `${this.logContext} -> downloadFinishedFile()`;
+
+        try {
+            const { id, fileId } = req.params;
+
+            if (!fileId) {
+                throw new CustomError(400, 'Missing fileId');
+            }
+
+            const order = await this.orderDataLayer.getById(id, logContext);
+            const file = order.finishedFiles?.find((f: any) => f.fileId?.toString() === fileId);
+
+            if (!file) {
+                throw new CustomError(404, 'Finished file not found on order');
+            }
+
+            const fileStream = await this.fileStorageUtil.downloadFile(fileId);
+
+            res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+
+            fileStream.pipe(res);
+        } catch (err) {
+            next(err);
+        }
+    };
+
+    /**
+     * DELETE /api/admin/orders/:id/finished-files/:fileId
+     * Delete an admin-uploaded finished file from GridFS and the order
+     */
+    public deleteFinishedFile: RequestHandler = async (req, res, next) => {
+        const logContext = `${this.logContext} -> deleteFinishedFile()`;
+
+        try {
+            const { id, fileId } = req.params;
+
+            if (!fileId) {
+                throw new CustomError(400, 'Missing fileId');
+            }
+
+            const order = await this.orderDataLayer.getById(id, logContext);
+            const file = order.finishedFiles?.find((f: any) => f.fileId?.toString() === fileId);
+
+            if (!file) {
+                throw new CustomError(404, 'Finished file not found on order');
+            }
+
+            // Delete from GridFS
+            await this.fileStorageUtil.deleteFile(new mongoose.Types.ObjectId(fileId));
+
+            // Remove from order's finishedFiles array
+            await this.orderDataLayer.update(id, {
+                $pull: { finishedFiles: { fileId: new ObjectId(fileId) } }
+            }, logContext);
+
+            // If no finished files remain, reset documentsGenerated
+            const updatedOrder = await this.orderDataLayer.getById(id, logContext);
+            if (!updatedOrder.finishedFiles || updatedOrder.finishedFiles.length === 0) {
+                await this.orderDataLayer.update(id, { documentsGenerated: false }, logContext);
+            }
+
+            res.status(200).json({
+                success: true,
+                data: updatedOrder,
+            });
         } catch (err) {
             next(err);
         }
@@ -301,6 +427,15 @@ export default class AdminController {
             next(err);
         }
     };
+
+    private streamToBuffer(stream: Readable): Promise<Buffer> {
+        return new Promise((resolve, reject) => {
+            const chunks: Buffer[] = [];
+            stream.on('data', (chunk) => chunks.push(chunk));
+            stream.on('end', () => resolve(Buffer.concat(chunks)));
+            stream.on('error', reject);
+        });
+    }
 
     private static instance: AdminController;
 

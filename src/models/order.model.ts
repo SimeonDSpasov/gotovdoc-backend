@@ -48,11 +48,10 @@ export interface IOrder {
   documentsSent: boolean;
   deliveryMethod?: 'upload' | 'physical' | 'download';
   finishedFiles?: Array<{
+    fileId: mongoose.Types.ObjectId;
     filename: string;
-    originalName: string;
-    path: string;
-    size: number;
     mimetype: string;
+    size: number;
     uploadedAt?: Date;
   }>;
   createdAt: Date;
@@ -163,11 +162,10 @@ const OrderSchema: Schema = new Schema(
     },
     finishedFiles: {
       type: [{
+        fileId: { type: mongoose.Schema.Types.ObjectId, required: true },
         filename: { type: String, required: true },
-        originalName: { type: String, required: true },
-        path: { type: String, required: true },
-        size: { type: Number, required: true },
         mimetype: { type: String, required: true },
+        size: { type: Number, required: true },
         uploadedAt: { type: Date, default: () => new Date() },
       }],
       required: false,
