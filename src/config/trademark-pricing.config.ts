@@ -30,27 +30,17 @@ export type MarkType = typeof VALID_MARK_TYPES[number];
 * Calculate trademark registration price.
 * No VAT is charged — subtotal equals total (these are BPO government fees).
 */
-export function calculateTrademarkPrice(params: {
- niceClassCount: number;
- priorityClaimCount: number;
- isCollective: boolean;
- isCertified: boolean;
-}): { subtotal: number; vat: number; total: number; currency: string } {
- const tier = (params.isCollective || params.isCertified)
-  ? TRADEMARK_PRICING.collectiveOrCertified
-  : TRADEMARK_PRICING.regular;
+export function calculateTrademarkPrice(params: { niceClassCount: number; priorityClaimCount: number; isCollective: boolean; isCertified: boolean }): { subtotal: number; vat: number; total: number; currency: string } {
+  const tier = (params.isCollective || params.isCertified)
+    ? TRADEMARK_PRICING.collectiveOrCertified
+    : TRADEMARK_PRICING.regular;
 
- const baseFee = tier.upToThreeClasses;
- const extraClasses = Math.max(0, params.niceClassCount - 3);
- const additionalClassesFee = extraClasses * tier.additionalClass;
- const priorityFee = params.priorityClaimCount * tier.priorityClaim;
+  const baseFee = tier.upToThreeClasses;
+  const extraClasses = Math.max(0, params.niceClassCount - 3);
+  const additionalClassesFee = extraClasses * tier.additionalClass;
+  const priorityFee = params.priorityClaimCount * tier.priorityClaim;
 
- const subtotal = Math.round((baseFee + additionalClassesFee + priorityFee) * 100) / 100;
+  const subtotal = Math.round((baseFee + additionalClassesFee + priorityFee) * 100) / 100;
 
- return {
-  subtotal,
-  vat: 0,
-  total: subtotal,
-  currency: 'EUR',
- };
+  return { subtotal, vat: 0, total: subtotal, currency: 'EUR' };
 }
