@@ -70,6 +70,12 @@ export default class Config {
  public stripeApiSecretKey = process.env.STRIPE_API_SECRET_KEY || '';
  public stripeWebhookSigningSecret = process.env.STRIPE_WEBHOOK_SIGNING_SECRET || '';
 
+ // Tawk.to
+ public tawkApiKey = process.env.TAWK_API_KEY || '';
+ public tawkWebhookSecret = process.env.TAWK_WEBHOOK_SECRET || '';
+ public tawkPropertyId = process.env.TAWK_PROPERTY_ID || '';
+ public tawkWidgetId = process.env.TAWK_WIDGET_ID || '';
+
  // EUIPO
  public euipoClientId = process.env.EUIPO_CLIENT_ID || '';
  public euipoClientSecret = process.env.EUIPO_CLIENT_SECRET || '';

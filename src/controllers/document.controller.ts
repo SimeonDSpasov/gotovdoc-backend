@@ -88,6 +88,10 @@ export default class DocumentController {
    }
   }
 
+  if (config.prepareRenderData) {
+   config.prepareRenderData(renderData);
+  }
+
   const filledDocx = DocumentController.renderTemplate(templateBuffer, renderData);
 
   const pdfStream = await LibreOfficeConverter.docxBufferToPdfStream(filledDocx).catch((err: Error) => {

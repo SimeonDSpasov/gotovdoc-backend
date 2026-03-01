@@ -43,8 +43,8 @@ export default class AppServer {
   app.use(json({
    limit: '300mb',
    verify: (req: IncomingMessage, res: ServerResponse, buffer: Buffer) => {
-    // Store raw body for Stripe webhook signature verification
-    if (req.url?.startsWith('/api/stripe/webhook')) {
+    // Store raw body for webhook signature verification
+    if (req.url?.startsWith('/api/stripe/webhook') || req.url?.startsWith('/api/tawk/webhook')) {
      (req as any).rawBody = buffer.toString();
     }
    },
@@ -57,7 +57,7 @@ export default class AppServer {
   const workerId = process.env.WORKER_ID || `worker-${Math.floor(Math.random() * 10000)}`;
 
   app.listen(this.config.server.port, () => {
-   logger.info(`${workerId} Server Started - Listening on http://${this.config.server.hostname}:${this.config.server.port} (env: ${this.config.env})`);
+   logger.info(`[${workerId}] Server Started - Listening on http://${this.config.server.hostname}:${this.config.server.port} (env: ${this.config.env})`);
   });
  }
 
