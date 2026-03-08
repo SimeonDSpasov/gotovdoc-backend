@@ -3,7 +3,7 @@ import CustomError from './../utils/custom-error.utils';
 import { calculateLoan } from './../utils/loan-calculation.util';
 import { amountToWordsEUR } from './../utils/number-to-bulgarian-words.util';
 
-export type DocumentRequestType = 'speciment' | 'mps_power_of_attorney' | 'leave_request' | 'loan_agreement' | 'source_of_funds_declaration' | 'employment_contract';
+export type DocumentRequestType = 'speciment' | 'mps_power_of_attorney' | 'leave_request' | 'loan_agreement' | 'source_of_funds_declaration' | 'employment_contract' | 'job_resignation_request' | 'criminal_record_certificate';
 
 /**
 * Convert a date string (ISO or similar) to Bulgarian format: dd.mm.yyyy г.
@@ -521,6 +521,75 @@ export const DOCUMENT_GENERATORS: Record<DocumentRequestType, DocumentGeneratorC
    data.work_experience_years = data.work_experience_years || '0';
    data.work_experience_months = data.work_experience_months || '0';
    data.work_experience_days = data.work_experience_days || '0';
+  },
+ },
+ job_resignation_request: {
+  type: DocumentType.JobResignationRequest,
+  templateName: 'Molba_Za_Napuskane_Template.docx',
+  requiredFields: [
+   'company_name',
+   'employee_full_name',
+   'employee_egn',
+   'employee_position',
+   'request_date',
+   'email',
+  ],
+  dateFields: ['request_date'],
+  documentName: 'Молба за напускане',
+  fileName: 'molba-za-napuskane.pdf',
+  orderItem: {
+   id: 'job-resignation-request',
+   name: 'Молба за напускане',
+   description: 'Молба за напускане по чл.325/чл.326 от КТ',
+  },
+  getEmailPayload: (data) => ({
+   fullName: data.employee_full_name,
+   companyName: data.company_name,
+   documentName: 'Молба за напускане',
+  }),
+  validate: (data) => {
+   if (!/^\d{10}$/.test(data.employee_egn)) {
+    throw new CustomError(400, 'Невалидно ЕГН (очаква се 10 цифри)');
+   }
+  },
+ },
+ criminal_record_certificate: {
+  type: DocumentType.CriminalRecordCertificate,
+  templateName: 'Zayavlenie_Svidetelstvo_Sadimost_Template.docx',
+  requiredFields: [
+   'applicant_full_name',
+   'applicant_egn',
+   'birth_date',
+   'birth_place',
+   'address',
+   'mother_name',
+   'father_name',
+   'court_name',
+   'purpose',
+   'application_city',
+   'application_date',
+   'email',
+  ],
+  dateFields: ['birth_date', 'application_date'],
+  documentName: 'Заявление за свидетелство за съдимост',
+  fileName: 'zayavlenie-svidetelstvo-sadimost.pdf',
+  orderItem: {
+   id: 'criminal-record-certificate',
+   name: 'Заявление за свидетелство за съдимост',
+   description: 'Заявление за издаване на свидетелство за съдимост',
+  },
+  getEmailPayload: (data) => ({
+   fullName: data.applicant_full_name,
+   companyName: '',
+   documentName: 'Заявление за свидетелство за съдимост',
+  }),
+  validate: (data) => {
+   if (!/^\d{10}$/.test(data.applicant_egn)) {
+    throw new CustomError(400, 'Невалидно ЕГН (очаква се 10 цифри)');
+   }
+
+   // Default citizenship if not provided
+   data.citizenship = data.citizenship || 'българско';
   },
  },
 };

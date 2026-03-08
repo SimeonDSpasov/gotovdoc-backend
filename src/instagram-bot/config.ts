@@ -48,10 +48,10 @@ export default class IgBotConfig {
 
  // Daily limits by warmup tier
  public limits: Record<string, { follow: { min: number; max: number }; like: { min: number; max: number } }> = {
-  'tier1': { follow: { min: 10, max: 15 }, like: { min: 15, max: 20 } },   // Days 1-3
-  'tier2': { follow: { min: 20, max: 30 }, like: { min: 30, max: 40 } },   // Days 4-7
-  'tier3': { follow: { min: 35, max: 50 }, like: { min: 50, max: 70 } },   // Days 8-14
-  'tier4': { follow: { min: 50, max: 80 }, like: { min: 80, max: 120 } },  // Days 15+
+  'tier1': { follow: { min: 20, max: 35 }, like: { min: 15, max: 20 } },   // Days 1-3
+  'tier2': { follow: { min: 35, max: 55 }, like: { min: 30, max: 40 } },   // Days 4-7
+  'tier3': { follow: { min: 55, max: 75 }, like: { min: 50, max: 70 } },   // Days 8-14
+  'tier4': { follow: { min: 95, max: 110 }, like: { min: 80, max: 120 } },  // Days 15+
  };
 
  // Filter rules

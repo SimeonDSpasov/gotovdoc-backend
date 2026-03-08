@@ -27,7 +27,7 @@ export default class ActionService {
   const page = this.browserService.getPage();
 
   try {
-   await page.goto(`https://www.instagram.com/${targetUsername}/`, { waitUntil: 'domcontentloaded' });
+   await page.goto(`https://www.instagram.com/${targetUsername}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
    await randomDelay(this.config.delays.pageLoad.min, this.config.delays.pageLoad.max);
 
    // Check for ban signals
@@ -78,7 +78,7 @@ export default class ActionService {
 
    // Make sure we're on the profile page
    if (!page.url().includes(`/${targetUsername}`)) {
-    await page.goto(`https://www.instagram.com/${targetUsername}/`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`https://www.instagram.com/${targetUsername}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await randomDelay(this.config.delays.pageLoad.min, this.config.delays.pageLoad.max);
    }
 
@@ -102,19 +102,17 @@ export default class ActionService {
    }
 
    await followButton.click();
-   await randomDelay(1000, 3000);
+   await randomDelay(3000, 5000);
 
-   // Verify follow was successful — check if "Follow" button is gone (changed to "Following"/"Requested")
-   const stillShowsFollow = await page.evaluate(() => {
-    const buttons = document.querySelectorAll('button');
-    for (const btn of buttons) {
-     const text = btn.textContent?.trim();
-     if (text === 'Follow') return true;
-    }
+   // Check for ban/block after clicking
+   const banCheck2 = await this.safetyService.detectBanSignal(page);
+   if (banCheck2.banned) {
+    await this.safetyService.handleBanSignal(this.config.username, banCheck2.signal!);
     return false;
-   });
+   }
 
-   if (!stillShowsFollow) {
+   // Follow click succeeded (no ban signal) — record it
+   {
     // Record follow in DB
     const unfollowDays = randomInt(this.config.unfollowWaitDays.min, this.config.unfollowWaitDays.max);
     const unfollowAfter = new Date(Date.now() + unfollowDays * 24 * 60 * 60 * 1000);
@@ -130,16 +128,6 @@ export default class ActionService {
     logger.info(`[${logContext}] Followed @${targetUsername} (unfollow after ${unfollowDays} days)`);
     return true;
    }
-
-   // Check if action was blocked
-   const banCheck2 = await this.safetyService.detectBanSignal(page);
-   if (banCheck2.banned) {
-    await this.safetyService.handleBanSignal(this.config.username, banCheck2.signal!);
-    return false;
-   }
-
-   logger.info(`[${logContext}] Follow click on @${targetUsername} may not have worked`);
-   return false;
 
   } catch (err: any) {
    logger.error(`followUser failed for @${targetUsername}: ${err.message}`, logContext);
@@ -158,7 +146,7 @@ export default class ActionService {
   try {
    // Make sure we're on the profile page
    if (!page.url().includes(`/${targetUsername}`)) {
-    await page.goto(`https://www.instagram.com/${targetUsername}/`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`https://www.instagram.com/${targetUsername}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await randomDelay(this.config.delays.pageLoad.min, this.config.delays.pageLoad.max);
    }
 
@@ -245,7 +233,7 @@ export default class ActionService {
 
   try {
    if (!page.url().includes(`/${targetUsername}`)) {
-    await page.goto(`https://www.instagram.com/${targetUsername}/`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`https://www.instagram.com/${targetUsername}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await randomDelay(this.config.delays.pageLoad.min, this.config.delays.pageLoad.max);
    }
 
@@ -302,7 +290,7 @@ export default class ActionService {
   const page = this.browserService.getPage();
 
   try {
-   await page.goto(`https://www.instagram.com/${targetUsername}/`, { waitUntil: 'domcontentloaded' });
+   await page.goto(`https://www.instagram.com/${targetUsername}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
    await randomDelay(this.config.delays.pageLoad.min, this.config.delays.pageLoad.max);
 
    // Scroll briefly before unfollowing
@@ -395,6 +383,10 @@ export default class ActionService {
    ActionService.instance = new ActionService();
   }
   return ActionService.instance;
+ }
+
+ public static reset(): void {
+  ActionService.instance = undefined as any;
  }
 
 }

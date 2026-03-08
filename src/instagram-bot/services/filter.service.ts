@@ -32,7 +32,7 @@ export default class FilterService {
   const logContext = `${this.logContext} -> evaluateTarget(${username})`;
 
   try {
-   await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded' });
+   await page.goto(`https://www.instagram.com/${username}/`, { waitUntil: 'domcontentloaded', timeout: 30000 });
    await randomDelay(this.config.delays.pageLoad.min, this.config.delays.pageLoad.max);
 
    const stats = await this.extractProfileStats(page);
@@ -172,6 +172,10 @@ export default class FilterService {
    FilterService.instance = new FilterService();
   }
   return FilterService.instance;
+ }
+
+ public static reset(): void {
+  FilterService.instance = undefined as any;
  }
 
 }

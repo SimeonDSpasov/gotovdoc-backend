@@ -78,93 +78,126 @@ export default class SessionService {
    // 3. Main action loop
    let actionsInBatch = 0;
    let lastUnfollowCycle = Date.now();
+   let consecutiveErrors = 0;
+   let discoveryOnlyMode = false;
 
    while (this.running && new Date() < sessionEndTime) {
-    // Check if it's time for an unfollow cycle (every 30-60 min)
-    const unfollowInterval = randomInt(30, 60) * 60 * 1000;
-    if (Date.now() - lastUnfollowCycle > unfollowInterval) {
-     await this.runUnfollowCycle();
-     lastUnfollowCycle = Date.now();
+    // Check if browser is still alive
+    if (!this.browserService.isAlive()) {
+     logger.error('Browser is dead — ending session for restart', logContext);
+     break;
     }
 
-    // Pop a target from the queue
-    const targets = await this.targetDataLayer.popNextBatch(this.config.username, 1);
-    if (targets.length === 0) {
-     logger.info(`[${logContext}] Target queue empty — running discovery...`);
-     await this.runDiscovery();
-     const newTargets = await this.targetDataLayer.popNextBatch(this.config.username, 1);
-     if (newTargets.length === 0) {
-      logger.info(`[${logContext}] No targets available — ending session`);
+    try {
+     // Check if it's time for an unfollow cycle (every 30-60 min)
+     const unfollowInterval = randomInt(30, 60) * 60 * 1000;
+     if (Date.now() - lastUnfollowCycle > unfollowInterval) {
+      await this.runUnfollowCycle();
+      lastUnfollowCycle = Date.now();
+     }
+
+     // If daily limits reached, switch to discovery-only mode
+     if (discoveryOnlyMode) {
+      logger.info(`[${logContext}] Discovery-only mode — fetching more targets...`);
+      await this.runDiscovery();
+      await randomDelay(this.config.delays.batchBreak.min, this.config.delays.batchBreak.max);
+      continue;
+     }
+
+     // Pop a target from the queue
+     const targets = await this.targetDataLayer.popNextBatch(this.config.username, 1);
+     if (targets.length === 0) {
+      logger.info(`[${logContext}] Target queue empty — running discovery...`);
+      await this.runDiscovery();
+      const newTargets = await this.targetDataLayer.popNextBatch(this.config.username, 1);
+      if (newTargets.length === 0) {
+       logger.info(`[${logContext}] No targets available — waiting before retry...`);
+       await randomDelay(60000, 120000);
+       continue;
+      }
+      targets.push(...newTargets);
+     }
+
+     const target = targets[0];
+
+     // Evaluate the target (visit profile + filter)
+     const page = this.browserService.getPage();
+     const filterResult = await this.filterService.evaluateTarget(page, target.targetUsername);
+
+     if (!filterResult.pass) {
+      await this.targetDataLayer.markFiltered(this.config.username, target.targetUsername, filterResult.stats);
+      logger.info(`[${logContext}] Filtered @${target.targetUsername}: ${filterResult.reason}`);
+      await randomDelay(2000, 5000);
+      consecutiveErrors = 0;
+      continue;
+     }
+
+     // Update target with quality score and stats
+     await this.targetDataLayer.markProcessed(this.config.username, target.targetUsername, filterResult.score, filterResult.stats);
+
+     // Core growth loop: follow + like
+     const actionRoll = Math.random();
+
+     if (actionRoll < 0.70) {
+      // 70%: Profile view → Follow → Like 1-2 posts
+      await this.coreGrowthAction(target.targetUsername, target.source || '');
+      actionsInBatch += 2; // follow + like count as 2
+     } else if (actionRoll < 0.85) {
+      // 15%: View story if available
+      await this.actionService.viewStory(target.targetUsername);
+      actionsInBatch += 1;
+     } else {
+      // 15%: Just view profile + like (no follow)
+      const likesCount = randomInt(1, 2);
+      await this.actionService.likeLatestPosts(target.targetUsername, likesCount);
+      actionsInBatch += 1;
+     }
+
+     // Log running totals after each action cycle
+     const runningCounts = await this.actionLogDataLayer.getTodayCounts(this.config.username);
+     logger.info(`[${logContext}] [STATS] Follows: ${runningCounts.follows} | Likes: ${runningCounts.likes} | Unfollows: ${runningCounts.unfollows} | Profile views: ${runningCounts.profileViews}`);
+
+     // Post-action delay
+     await randomDelay(this.config.delays.betweenActions.min, this.config.delays.betweenActions.max);
+
+     // Check if we need a batch break
+     const breakCheck = this.safetyService.shouldTakeBreak(actionsInBatch);
+     if (breakCheck.shouldBreak) {
+      const breakMin = Math.round(breakCheck.breakMs / 60000);
+      logger.info(`[${logContext}] Taking a ${breakMin} min break after ${actionsInBatch} actions...`);
+
+      // Save session during break
+      await this.browserService.savePersistence();
+
+      await randomDelay(breakCheck.breakMs, breakCheck.breakMs + 60000);
+      actionsInBatch = 0;
+
+      // Log progress
+      const counts = await this.actionLogDataLayer.getTodayCounts(this.config.username);
+      logger.info(`[${logContext}] Today's stats: ${counts.follows} follows, ${counts.likes} likes, ${counts.profileViews} profile views`);
+     }
+
+     // Check daily limits
+     const canFollow = await this.safetyService.canPerformAction(this.config.username, 'follow');
+     const canLike = await this.safetyService.canPerformAction(this.config.username, 'like');
+
+     if (!canFollow.allowed && !canLike.allowed) {
+      logger.info(`[${logContext}] All daily action limits reached — switching to discovery-only mode`);
+      discoveryOnlyMode = true;
+     }
+
+     consecutiveErrors = 0;
+
+    } catch (err: any) {
+     consecutiveErrors++;
+     logger.error(`Action iteration error (${consecutiveErrors}/5): ${err.message}`, logContext);
+
+     if (consecutiveErrors >= 5) {
+      logger.error('Too many consecutive errors — ending session for restart', logContext);
       break;
      }
-     targets.push(...newTargets);
-    }
 
-    const target = targets[0];
-
-    // Evaluate the target (visit profile + filter)
-    const page = this.browserService.getPage();
-    const filterResult = await this.filterService.evaluateTarget(page, target.targetUsername);
-
-    if (!filterResult.pass) {
-     await this.targetDataLayer.markFiltered(this.config.username, target.targetUsername, filterResult.stats);
-     logger.info(`[${logContext}] Filtered @${target.targetUsername}: ${filterResult.reason}`);
-     await randomDelay(2000, 5000);
-     continue;
-    }
-
-    // Update target with quality score and stats
-    await this.targetDataLayer.markProcessed(this.config.username, target.targetUsername, filterResult.score, filterResult.stats);
-
-    // Core growth loop: follow + like
-    const actionRoll = Math.random();
-
-    if (actionRoll < 0.70) {
-     // 70%: Profile view → Follow → Like 1-2 posts
-     await this.coreGrowthAction(target.targetUsername, target.source || '');
-     actionsInBatch += 2; // follow + like count as 2
-    } else if (actionRoll < 0.85) {
-     // 15%: View story if available
-     await this.actionService.viewStory(target.targetUsername);
-     actionsInBatch += 1;
-    } else {
-     // 15%: Just view profile + like (no follow)
-     const likesCount = randomInt(1, 2);
-     await this.actionService.likeLatestPosts(target.targetUsername, likesCount);
-     actionsInBatch += 1;
-    }
-
-    // Log running totals after each action cycle
-    const runningCounts = await this.actionLogDataLayer.getTodayCounts(this.config.username);
-    logger.info(`[${logContext}] [STATS] Follows: ${runningCounts.follows} | Likes: ${runningCounts.likes} | Unfollows: ${runningCounts.unfollows} | Profile views: ${runningCounts.profileViews}`);
-
-    // Post-action delay
-    await randomDelay(this.config.delays.betweenActions.min, this.config.delays.betweenActions.max);
-
-    // Check if we need a batch break
-    const breakCheck = this.safetyService.shouldTakeBreak(actionsInBatch);
-    if (breakCheck.shouldBreak) {
-     const breakMin = Math.round(breakCheck.breakMs / 60000);
-     logger.info(`[${logContext}] Taking a ${breakMin} min break after ${actionsInBatch} actions...`);
-
-     // Save session during break
-     await this.browserService.savePersistence();
-
-     await randomDelay(breakCheck.breakMs, breakCheck.breakMs + 60000);
-     actionsInBatch = 0;
-
-     // Log progress
-     const counts = await this.actionLogDataLayer.getTodayCounts(this.config.username);
-     logger.info(`[${logContext}] Today's stats: ${counts.follows} follows, ${counts.likes} likes, ${counts.profileViews} profile views`);
-    }
-
-    // Check daily limits
-    const canFollow = await this.safetyService.canPerformAction(this.config.username, 'follow');
-    const canLike = await this.safetyService.canPerformAction(this.config.username, 'like');
-
-    if (!canFollow.allowed && !canLike.allowed) {
-     logger.info(`[${logContext}] All daily limits reached — ending session`);
-     break;
+     await randomDelay(10000, 30000);
     }
    }
 
@@ -263,6 +296,10 @@ export default class SessionService {
    SessionService.instance = new SessionService();
   }
   return SessionService.instance;
+ }
+
+ public static reset(): void {
+  SessionService.instance = undefined as any;
  }
 
 }

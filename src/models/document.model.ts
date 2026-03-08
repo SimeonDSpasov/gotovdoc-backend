@@ -13,6 +13,8 @@ export enum DocumentType {
  LoanAgreement,
  SourceOfFundsDeclaration,
  EmploymentContract,
+ JobResignationRequest,
+ CriminalRecordCertificate,
  Certificate,
  License,
  Passport,

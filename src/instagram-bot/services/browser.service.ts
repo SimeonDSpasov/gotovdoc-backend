@@ -65,7 +65,22 @@ export default class BrowserService {
    launchOptions.proxy = { server: this.config.proxy };
   }
 
+  // Close any stale browser before launching
+  if (this.browser) {
+   await this.browser.close().catch(() => {});
+   this.browser = null;
+   this.context = null;
+   this.page = null;
+  }
+
   this.browser = await chromium.launch(launchOptions);
+
+  this.browser.on('disconnected', () => {
+   logger.error('Browser disconnected unexpectedly', `${this.logContext} -> launch()`);
+   this.browser = null;
+   this.context = null;
+   this.page = null;
+  });
 
   const contextOptions: any = {
    viewport: account.viewport,
@@ -144,6 +159,10 @@ export default class BrowserService {
   }
  }
 
+ public isAlive(): boolean {
+  return this.browser?.isConnected() === true && this.page !== null;
+ }
+
  private static instance: BrowserService;
 
  public static getInstance(): BrowserService {
@@ -151,6 +170,10 @@ export default class BrowserService {
    BrowserService.instance = new BrowserService();
   }
   return BrowserService.instance;
+ }
+
+ public static reset(): void {
+  BrowserService.instance = undefined as any;
  }
 
 }

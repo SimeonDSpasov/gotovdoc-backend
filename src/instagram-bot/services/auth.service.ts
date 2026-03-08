@@ -21,7 +21,7 @@ export default class AuthService {
   const page = this.browserService.getPage();
 
   // Navigate to Instagram
-  await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded' });
+  await page.goto('https://www.instagram.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
   await randomDelay(3000, 5000);
 
   // Dismiss cookie consent early — it can block the entire page
@@ -74,7 +74,7 @@ export default class AuthService {
   try {
    // Navigate to login page if not already there
    if (!page.url().includes('/accounts/login')) {
-    await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'domcontentloaded' });
+    await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await randomDelay(3000, 5000);
    }
 
@@ -90,7 +90,7 @@ export default class AuthService {
    if (!inputVisible) {
     // Try navigating directly to the login page again
     logger.info(`[${logContext}] Username input not found, retrying navigation...`);
-    await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'networkidle' });
+    await page.goto('https://www.instagram.com/accounts/login/', { waitUntil: 'networkidle', timeout: 30000 });
     await randomDelay(3000, 5000);
     await this.dismissCookieConsent(page);
 
@@ -220,6 +220,10 @@ export default class AuthService {
    AuthService.instance = new AuthService();
   }
   return AuthService.instance;
+ }
+
+ public static reset(): void {
+  AuthService.instance = undefined as any;
  }
 
 }

@@ -126,4 +126,8 @@ export default class SafetyService {
   return SafetyService.instance;
  }
 
+ public static reset(): void {
+  SafetyService.instance = undefined as any;
+ }
+
 }
