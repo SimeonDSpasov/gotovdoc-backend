@@ -13,6 +13,9 @@ import DocumentDataLayer from './../data-layers/document.data-layer';
 import OrderDataLayer from './../data-layers/order.data-layer';
 import TrademarkOrderDataLayer from './../data-layers/trademark-order.data-layer';
 import StripeEventDataLayer from './../data-layers/stripe-event.data-layer';
+import SubscriptionDataLayer from './../data-layers/subscription.data-layer';
+import SubscriptionPlanDataLayer from './../data-layers/subscription-plan.data-layer';
+import UserDataLayer from './../data-layers/user.data-layer';
 
 import { DocumentType } from './../models/document.model';
 
@@ -26,6 +29,9 @@ export default class StripeController {
  private orderDataLayer = OrderDataLayer.getInstance();
  private trademarkOrderDataLayer = TrademarkOrderDataLayer.getInstance();
  private stripeEventDataLayer = StripeEventDataLayer.getInstance();
+ private subscriptionDataLayer = SubscriptionDataLayer.getInstance();
+ private subscriptionPlanDataLayer = SubscriptionPlanDataLayer.getInstance();
+ private userDataLayer = UserDataLayer.getInstance();
  private priceValidationService = PriceValidationService;
  private config = Config.getInstance();
 
@@ -250,6 +256,15 @@ export default class StripeController {
    case 'checkout.session.completed':
     await this.handleCompletedCheckout(event, logContext);
     break;
+   case 'customer.subscription.deleted':
+    await this.handleSubscriptionDeleted(event, logContext);
+    break;
+   case 'invoice.paid':
+    await this.handleInvoicePaid(event, logContext);
+    break;
+   case 'invoice.payment_failed':
+    await this.handleInvoicePaymentFailed(event, logContext);
+    break;
    default:
     logger.info(`Unhandled Stripe event type: ${event.type}`);
   }
@@ -312,6 +327,12 @@ export default class StripeController {
   }
 
   const { orderId, orderType } = session.metadata;
+
+  // Handle subscription checkout
+  if (orderType === StripeSaleType.Subscription || session.mode === 'subscription') {
+   await this.handleSubscriptionCheckoutCompleted(session, logContext);
+   return;
+  }
 
   if (!orderId) {
    throw new CustomError(400, 'Missing orderId in session metadata', logContext);
@@ -431,6 +452,179 @@ export default class StripeController {
   }, logContext);
 
   logger.info(`Trademark order ${orderId} paid successfully via Stripe`);
+ }
+
+ /**
+  * Handle subscription checkout completed
+  */
+ private async handleSubscriptionCheckoutCompleted(session: Stripe.Checkout.Session, logContext: string): Promise<void> {
+  logContext = `${logContext} -> handleSubscriptionCheckoutCompleted()`;
+
+  const stripeSubscriptionId = session.subscription as string;
+
+  if (!stripeSubscriptionId) {
+   logger.error('No subscription ID in checkout session', logContext);
+   return;
+  }
+
+  const userId = session.metadata?.userId;
+  const stripeCustomerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+
+  if (!userId) {
+   logger.error('No userId in session metadata', logContext);
+   return;
+  }
+
+  // Retrieve the full Stripe subscription
+  const stripeSubscription = await this.stripeService.retrieveSubscription(stripeSubscriptionId, logContext);
+
+  // Get the plan from the price
+  const priceId = stripeSubscription.items.data[0]?.price?.id;
+
+  if (!priceId) {
+   logger.error('No price ID found in subscription items', logContext);
+   return;
+  }
+
+  const plan = await this.subscriptionPlanDataLayer.getByStripePriceId(priceId, logContext).catch(err => {
+   logger.error(`Plan not found for priceId: ${priceId} - ${err.message}`, logContext);
+   return null;
+  });
+
+  if (!plan) return;
+
+  // Check for existing subscription
+  const existingSub = await this.subscriptionDataLayer.getActiveByUserId(userId, logContext);
+
+  if (existingSub) {
+   logger.info(`User ${userId} already has an active subscription, syncing...`, logContext);
+   await this.stripeService.syncSubscriptionModel(stripeSubscription, logContext);
+   return;
+  }
+
+  // Create local subscription record
+  await this.subscriptionDataLayer.create({
+   userId: new mongoose.Types.ObjectId(userId),
+   stripeCustomerId: stripeCustomerId || '',
+   stripeSubscriptionId,
+   status: stripeSubscription.status as any,
+   cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+   currentPeriodStart: new Date(stripeSubscription.items.data[0].current_period_start * 1000),
+   currentPeriodEnd: new Date(stripeSubscription.items.data[0].current_period_end * 1000),
+   planType: plan.type,
+   planLabel: plan.label,
+   planCost: plan.cost,
+   planCurrency: plan.currency,
+   planCallsLimit: plan.callsLimit,
+   planStripePriceId: plan.stripePriceId,
+   planStripeProductId: plan.stripeProductId,
+   usage: {
+    currentPeriodCalls: 0,
+    totalCalls: 0,
+   },
+  }, logContext);
+
+  logger.info(`Subscription created for user: ${userId}, plan: ${plan.type}`, logContext);
+ }
+
+ /**
+  * Handle customer.subscription.deleted event
+  */
+ private async handleSubscriptionDeleted(event: Stripe.Event, logContext: string): Promise<void> {
+  logContext = `${logContext} -> handleSubscriptionDeleted()`;
+
+  const stripeSubscription = event.data.object as Stripe.Subscription;
+  const stripeSubId = stripeSubscription.id;
+
+  const subscription = await this.subscriptionDataLayer.getByStripeSubscriptionId(stripeSubId, logContext);
+
+  if (!subscription) {
+   logger.info(`No local subscription found for stripeSubscriptionId: ${stripeSubId}`, logContext);
+   return;
+  }
+
+  if (subscription.status === 'canceled') {
+   return;
+  }
+
+  await this.subscriptionDataLayer.update(subscription._id, {
+   $set: {
+    status: 'canceled',
+    cancelAtPeriodEnd: false,
+   },
+  }, logContext);
+
+  logger.info(`Subscription ${stripeSubId} marked as canceled`, logContext);
+ }
+
+ /**
+  * Handle invoice.paid event (subscription renewals)
+  */
+ private async handleInvoicePaid(event: Stripe.Event, logContext: string): Promise<void> {
+  logContext = `${logContext} -> handleInvoicePaid()`;
+
+  const invoice = event.data.object as Stripe.Invoice;
+  const stripeSubscriptionId = this.getSubscriptionIdFromInvoice(invoice);
+
+  if (!stripeSubscriptionId) {
+   // Not a subscription invoice, skip
+   return;
+  }
+
+  // Skip the initial invoice — checkout.session.completed handles subscription creation
+  if (invoice.billing_reason === 'subscription_create') {
+   logger.info(`Skipping initial invoice for subscription: ${stripeSubscriptionId}`, logContext);
+   return;
+  }
+
+  // Retrieve the subscription to sync
+  const stripeSubscription = await this.stripeService.retrieveSubscription(stripeSubscriptionId, logContext);
+
+  // Sync subscription model (updates period dates, status, etc.)
+  await this.stripeService.syncSubscriptionModel(stripeSubscription, logContext);
+
+  // Reset period usage on renewal (billing_reason: 'subscription_cycle')
+  if (invoice.billing_reason === 'subscription_cycle') {
+   await this.subscriptionDataLayer.resetPeriodUsage(stripeSubscriptionId, logContext).catch(err => {
+    logger.error(`Failed to reset period usage: ${err.message}`, logContext);
+   });
+
+   logger.info(`Subscription ${stripeSubscriptionId} renewed, usage reset`, logContext);
+  }
+ }
+
+ /**
+  * Handle invoice.payment_failed event
+  */
+ private async handleInvoicePaymentFailed(event: Stripe.Event, logContext: string): Promise<void> {
+  logContext = `${logContext} -> handleInvoicePaymentFailed()`;
+
+  const invoice = event.data.object as Stripe.Invoice;
+  const stripeSubscriptionId = this.getSubscriptionIdFromInvoice(invoice);
+
+  if (!stripeSubscriptionId) {
+   return;
+  }
+
+  // Retrieve and sync the subscription (status will be 'past_due' or 'unpaid')
+  const stripeSubscription = await this.stripeService.retrieveSubscription(stripeSubscriptionId, logContext);
+  await this.stripeService.syncSubscriptionModel(stripeSubscription, logContext);
+
+  logger.error(`Payment failed for subscription: ${stripeSubscriptionId}`, logContext);
+ }
+
+ /**
+  * Extract the subscription ID from a Stripe Invoice object.
+  * In Stripe API v20+, subscription info is under invoice.parent.subscription_details.subscription
+  */
+ private getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | undefined {
+  const subDetails = invoice.parent?.subscription_details;
+
+  if (!subDetails) return undefined;
+
+  return typeof subDetails.subscription === 'string'
+   ? subDetails.subscription
+   : subDetails.subscription?.id;
  }
 
  private generateOrderId(): string {

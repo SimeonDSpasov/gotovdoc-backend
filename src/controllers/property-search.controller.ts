@@ -8,6 +8,9 @@ import FileStorageUtil from './../utils/file-storage.util';
 
 import OrderDataLayer from './../data-layers/order.data-layer';
 import UserDataLayer from './../data-layers/user.data-layer';
+import SubscriptionDataLayer from './../data-layers/subscription.data-layer';
+
+import { ACTIVE_SUBSCRIPTION_STATUSES } from './../models/subscription.model';
 
 import { EmailType, EmailUtil } from './../utils/email.util';
 import Config from './../config';
@@ -18,6 +21,7 @@ export default class PropertySearchController {
 
  private orderDataLayer = OrderDataLayer.getInstance();
  private userDataLayer = UserDataLayer.getInstance();
+ private subscriptionDataLayer = SubscriptionDataLayer.getInstance();
  private fileStorageUtil = FileStorageUtil.getInstance();
  private emailUtil = EmailUtil.getInstance();
  private config = Config.getInstance();
@@ -80,6 +84,18 @@ export default class PropertySearchController {
    fs.unlinkSync(file.path);
   }
 
+  // Check if user has an active subscription with remaining calls
+  let useSubscription = false;
+  let subscription = null;
+
+  if (req.user?._id) {
+   subscription = await this.subscriptionDataLayer.getActiveByUserId(req.user._id, logContext);
+
+   if (subscription && subscription.usage.currentPeriodCalls < subscription.planCallsLimit) {
+    useSubscription = true;
+   }
+  }
+
   // Create Order — fixed price of €7, no VAT (government service fee)
   const price = 7;
   const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -94,12 +110,15 @@ export default class PropertySearchController {
    orderId,
    userId: req.user?._id,
    userUploadedFiles: uploadedFiles,
-   subtotal: price,
+   subtotal: useSubscription ? 0 : price,
    vat: 0,
-   total: price,
-   expectedAmount: price,
+   total: useSubscription ? 0 : price,
+   expectedAmount: useSubscription ? 0 : price,
+   paidAmount: useSubscription ? 0 : undefined,
    currency: 'EUR',
-   status: 'pending',
+   status: useSubscription ? 'paid' : 'pending',
+   paymentMethod: 'stripe',
+   ...(useSubscription ? { paidAt: new Date() } : {}),
    items: [{
     id: 'property-search',
     type: 'package',
@@ -168,6 +187,27 @@ export default class PropertySearchController {
 
   this.emailUtil.sendEmail(emailData, EmailType.Info, logContext)
    .catch((err: any) => logger.error(`Failed to send new order email: ${err.message}`, logContext));
+
+  // Track subscription usage if applicable
+  if (useSubscription && req.user?._id) {
+   const updatedSub = await this.subscriptionDataLayer.incrementUsage(req.user._id, logContext)
+    .catch((err: any) => {
+     logger.error(`Failed to increment subscription usage: ${err.message}`, logContext);
+     return subscription;
+    });
+
+   res.status(201).json({
+    success: true,
+    data: order,
+    subscription: {
+     used: true,
+     usedCalls: updatedSub?.usage?.currentPeriodCalls ?? 0,
+     remainingCalls: Math.max(0, (updatedSub?.planCallsLimit ?? 0) - (updatedSub?.usage?.currentPeriodCalls ?? 0)),
+     callsLimit: updatedSub?.planCallsLimit ?? 0,
+    },
+   });
+   return;
+  }
 
   res.status(201).json({
    success: true,

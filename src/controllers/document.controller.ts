@@ -1,4 +1,7 @@
 import { RequestHandler } from 'express';
+import { createReadStream } from 'fs';
+import { promises as fsPromises } from 'fs';
+import path from 'path';
 
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
@@ -45,12 +48,16 @@ export default class DocumentController {
  }
 
  public downloadDocument: RequestHandler = async (req, res) => {
-  const { orderId } = req.params;
+  const { downloadToken } = req.params;
 
   const logContext = `${this.logContext} -> downloadDocument()`;
 
+  if (!downloadToken || typeof downloadToken !== 'string' || !/^[a-f0-9]{64}$/.test(downloadToken)) {
+   throw new CustomError(400, 'Invalid download token');
+  }
+
   // Verify payment was completed
-  const document = await this.documentDataLayer.getById(orderId, logContext);
+  const document = await this.documentDataLayer.get({ downloadToken }, logContext);
   if (!document.orderId) {
    throw new CustomError(403, 'Payment required to download document');
   }
@@ -144,6 +151,28 @@ export default class DocumentController {
   }
 
   await this.generateByType(type as DocumentRequestType, req, res);
+ }
+
+ public getSampleImage: RequestHandler = async (req, res) => {
+  const { type } = req.params;
+
+  if (!DOCUMENT_GENERATORS[type as DocumentRequestType]) {
+   throw new CustomError(400, 'Unsupported document type');
+  }
+
+  const samplePath = path.join(process.cwd(), 'src', 'assets', 'samples', `${type}.png`);
+
+  try {
+   await fsPromises.access(samplePath);
+  } catch {
+   throw new CustomError(404, 'Sample image not found. Run generate:samples script.');
+  }
+
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+
+  const stream = createReadStream(samplePath);
+  stream.pipe(res);
  }
 
  private async generateByType(type: DocumentRequestType, req: any, res: any): Promise<void> {
@@ -277,10 +306,11 @@ export default class DocumentController {
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${config.fileName}"`);
+  res.setHeader("X-Download-Token", document.downloadToken);
   res.end(pdfBuffer);
  }
 
- private static decodeHtmlEntities(value: string): string {
+ public static decodeHtmlEntities(value: string): string {
   return value
    .replace(/&quot;/g, '"')
    .replace(/&#39;/g, "'")
@@ -289,7 +319,7 @@ export default class DocumentController {
    .replace(/&amp;/g, '&');
  }
 
- private static sanitizeData(data: Record<string, unknown>): Record<string, unknown> {
+ public static sanitizeData(data: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(data)) {
@@ -303,14 +333,14 @@ export default class DocumentController {
   return result;
  }
 
- private static renderTemplate(templateBuffer: Buffer, data: Record<string, unknown>): Buffer {
+ public static renderTemplate(templateBuffer: Buffer, data: Record<string, unknown>): Buffer {
   const zip = new PizZip(templateBuffer);
   const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
   doc.render(DocumentController.sanitizeData(data));
   return doc.getZip().generate({ type: "nodebuffer" });
  }
 
- private static streamToBuffer(stream: Readable): Promise<Buffer> {
+ public static streamToBuffer(stream: Readable): Promise<Buffer> {
   return new Promise((resolve, reject) => {
    const chunks: Buffer[] = [];
    stream.on('data', (chunk) => {

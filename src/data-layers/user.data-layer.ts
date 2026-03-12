@@ -143,6 +143,18 @@ public async appendActivity(
   });
  }
 
+ public async getByStripeCustomerId(stripeCustomerId: string, logContext: string): Promise<UserDoc | null> {
+  logContext = `${logContext} -> ${this.logContext} -> getByStripeCustomerId()`;
+
+  const user = await User.findOne({ 'stripe.customerId': stripeCustomerId })
+   .select('-password')
+   .catch(err => {
+    throw new CustomError(500, err.message, `${logContext} -> stripeCustomerId: ${stripeCustomerId}`);
+   });
+
+  return user;
+ }
+
  private buildChunkSearchStage(searchTerm: string): any | null {
   if (!searchTerm) {
    return null;

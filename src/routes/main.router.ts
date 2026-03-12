@@ -7,6 +7,7 @@ import DocumentRouter from './document.router';
 import EmailRouter from './email.router';
 import StripeRouter from './stripe.router';
 import PropertySearchRouter from './property-search.router';
+import SubscriptionRouter from './subscription.router';
 import TrademarkRouter from './trademark.router';
 import BlogRouter from './blog.router';
 import LocationRouter from './location.router';
@@ -32,6 +33,8 @@ MainRouter.use('/api/capital-revaluation', CapitalRevaluationRouter);
 MainRouter.use('/api/trademark', TrademarkRouter);
 
 MainRouter.use('/api/property-search', PropertySearchRouter);
+
+MainRouter.use('/api/subscription', SubscriptionRouter);
 
 MainRouter.use('/api/admin', AdminRouter);
 

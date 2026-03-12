@@ -30,6 +30,9 @@ interface IUser {
  firstName: string;
  lastName: string;
  suspended: boolean,
+ stripe?: {
+  customerId?: string;
+ };
  activity?: IUserActivity[];
  createdAt: Date;
 }
@@ -68,6 +71,9 @@ const UserSchema = new mongoose.Schema<IUser>({
  suspended: {
   type: Boolean,
   default: false,
+ },
+ stripe: {
+  customerId: { type: String, default: '' },
  },
  activity: {
   type: [{

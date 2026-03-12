@@ -18,9 +18,14 @@ DocumentRouter.post(
 );
 
 DocumentRouter.get(
-  '/download/:orderId',
+  '/download/:downloadToken',
   useCatch(authMiddleware.attachUserIfPresent),
   useCatch(documentController.downloadDocument)
+);
+
+DocumentRouter.get(
+  '/sample/:type',
+  useCatch(documentController.getSampleImage)
 );
 
 export default DocumentRouter;

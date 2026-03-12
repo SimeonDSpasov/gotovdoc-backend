@@ -77,21 +77,23 @@ export async function getCachedCities(regionId: number): Promise<BgCity[]> {
 }
 
 /**
- * Seeds Bulgarian cities data. Checks Redis first — if data already exists
- * (seeded by another worker), skips the API fetch. Otherwise fetches from
- * bgpostcode.com and stores in Redis for all workers to share.
+ * Seeds Bulgarian cities data. Uses a Redis lock so only one worker fetches
+ * from the API. Other workers wait and load from Redis once seeding is done.
  */
 export async function seedBulgarianCities(): Promise<void> {
   const logContext = 'SeedBulgarianCities';
   const redis = RedisUtil.getClient();
+  const lockKey = getRedisKey('seed-lock');
+  const maxRetries = 15;
+  const retryDelay = 2000;
 
-  // Check if Redis already has the data (seeded by another worker)
+  // Check if Redis already has the data
   if (redis) {
     try {
       const existing = await redis.get(getRedisKey('regions'));
       if (existing) {
         localRegionsCache = JSON.parse(existing) as BgRegion[];
-        logger.info(`Loaded ${localRegionsCache.length} regions from Redis (already seeded).`, logContext);
+        logger.info(`Loaded ${localRegionsCache.length} regions from Redis (already seeded).`);
         return;
       }
     } catch (err: any) {
@@ -99,7 +101,31 @@ export async function seedBulgarianCities(): Promise<void> {
     }
   }
 
-  // Fetch from API
+  // Try to acquire lock — only one worker seeds
+  if (redis) {
+    const acquired = await redis.set(lockKey, '1', 'EX', 60, 'NX').catch(() => null);
+
+    if (!acquired) {
+      // Another worker is seeding — wait for it to finish
+      logger.info('Another worker is seeding cities, waiting...',);
+
+      for (let i = 0; i < maxRetries; i++) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+
+        const existing = await redis.get(getRedisKey('regions')).catch(() => null);
+        if (existing) {
+          localRegionsCache = JSON.parse(existing) as BgRegion[];
+          logger.info(`Loaded ${localRegionsCache.length} regions from Redis (seeded by another worker).`);
+          return;
+        }
+      }
+
+      logger.error('Timed out waiting for another worker to seed cities.', logContext);
+      return;
+    }
+  }
+
+  // This worker does the seeding
   try {
     const regionsResponse = await fetch(`${BG_POSTCODE_BASE}/regions`);
     if (!regionsResponse.ok) {
@@ -109,16 +135,7 @@ export async function seedBulgarianCities(): Promise<void> {
     const regions = (await regionsResponse.json()) as BgRegion[];
     localRegionsCache = regions;
 
-    logger.info(`Fetched ${regions.length} Bulgarian regions.`, logContext);
-
-    // Store regions in Redis
-    if (redis) {
-      try {
-        await redis.set(getRedisKey('regions'), JSON.stringify(regions));
-      } catch (err: any) {
-        logger.error(`Redis set regions failed: ${err.message}`, logContext);
-      }
-    }
+    logger.info(`Fetched ${regions.length} Bulgarian regions.`);
 
     // Fetch cities for each region in parallel (batched to avoid rate limiting)
     const batchSize = 5;
@@ -134,7 +151,6 @@ export async function seedBulgarianCities(): Promise<void> {
 
           const cities = (await response.json()) as BgCity[];
 
-          // Sort: cities/towns (type_id=2) first, then alphabetically
           cities.sort((a, b) => {
             if (a.type_id !== b.type_id) return b.type_id - a.type_id;
             return a.name.localeCompare(b.name, 'bg');
@@ -142,13 +158,10 @@ export async function seedBulgarianCities(): Promise<void> {
 
           localCitiesCache.set(region.id, cities);
 
-          // Store in Redis
           if (redis) {
-            try {
-              await redis.set(getRedisKey(`region:${region.id}:cities`), JSON.stringify(cities));
-            } catch (err: any) {
+            await redis.set(getRedisKey(`region:${region.id}:cities`), JSON.stringify(cities)).catch((err: any) => {
               logger.error(`Redis set cities failed for region ${region.id}: ${err.message}`, logContext);
-            }
+            });
           }
 
           return cities.length;
@@ -161,9 +174,21 @@ export async function seedBulgarianCities(): Promise<void> {
       }
     }
 
+    // Store regions in Redis last — this signals to other workers that seeding is complete
+    if (redis) {
+      await redis.set(getRedisKey('regions'), JSON.stringify(regions)).catch((err: any) => {
+        logger.error(`Redis set regions failed: ${err.message}`, logContext);
+      });
+    }
+
     const totalCities = Array.from(localCitiesCache.values()).reduce((sum, cities) => sum + cities.length, 0);
-    logger.info(`Cached ${totalCities} cities across ${localCitiesCache.size} regions in Redis.`, logContext);
+    logger.info(`Cached ${totalCities} cities across ${localCitiesCache.size} regions in Redis.`);
   } catch (err: any) {
     logger.error(`Failed to seed Bulgarian cities: ${err.message}`, logContext);
+  } finally {
+    // Release lock
+    if (redis) {
+      await redis.del(lockKey).catch(() => {});
+    }
   }
 }

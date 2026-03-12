@@ -1,4 +1,5 @@
 import mongoose, { ObjectId, Schema, Types } from 'mongoose';
+import crypto from 'crypto';
 
 import bcryptjs from 'bcryptjs';
 
@@ -42,6 +43,7 @@ export interface DocumentData {
 interface IDocument {
  type: DocumentType;
  data: DocumentData;
+ downloadToken: string;
  orderId?: ObjectId;
  userId?: ObjectId;
  createdAt: Date;
@@ -56,6 +58,13 @@ const DocumentSchema = new mongoose.Schema<IDocument>({
  data: {
   type: Object,
   required: true,
+ },
+ downloadToken: {
+  type: String,
+  required: true,
+  unique: true,
+  index: true,
+  default: () => crypto.randomBytes(32).toString('hex'),
  },
  orderId: {
   type: Schema.Types.ObjectId,

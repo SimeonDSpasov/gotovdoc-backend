@@ -37,6 +37,7 @@ export default class AppServer {
     return callback(new Error('Not allowed by CORS'));
    },
    credentials: true,
+   exposedHeaders: ['X-Download-Token'],
    optionsSuccessStatus: 204
   }));
 

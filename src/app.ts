@@ -12,6 +12,7 @@ import { registerEuipoSyncCron } from './cronjobs/euipo-sync.cron';
 import { registerNkpdRefreshCron } from './cronjobs/nkpd-refresh.cron';
 import { seedBulgarianCities } from './data/bulgarian-cities-seed';
 import EuipoService from './services/euipo.service';
+import SubscriptionPlansSeedScript from './scripts/seed-subscription-plans';
 
 (async () => {
  try {
@@ -24,6 +25,7 @@ import EuipoService from './services/euipo.service';
   }
 
   if (process.env.WORKER_ID === 'worker-1') {
+   new SubscriptionPlansSeedScript().seedPlans();
    registerOrderCleanupCron();
    registerEuipoSyncCron();
    registerNkpdRefreshCron();
